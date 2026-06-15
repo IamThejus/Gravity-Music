@@ -110,7 +110,7 @@ class _Bar extends StatelessWidget {
         // Tint follows the artwork accent; rebuilds only when the accent changes.
         child: Obx(() => GlassContainer(
               radius: AppRadius.lg,
-              blur: 30,
+              blur: 24,
               shadow: kGlassShadow,
               fill: Color.alphaBlend(
                   colors.accent.value.withOpacity(0.14), AppColors.glassFill),
@@ -124,10 +124,15 @@ class _Bar extends StatelessWidget {
                         const SizedBox(width: 8),
                         Hero(
                           tag: kNowPlayingArtTag,
+                          // Straight-line rect tween: the artwork scales up
+                          // directly instead of the default arc swoop, which
+                          // reads cleaner and faster on a vertical expansion.
+                          createRectTween: (begin, end) =>
+                              RectTween(begin: begin, end: end),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(AppRadius.sm),
                             child: AnimatedSwitcher(
-                              duration: AppMotion.standard,
+                              duration: AppMotion.brisk,
                               switchInCurve: AppMotion.standardCurve,
                               child: art.isEmpty
                                   ? Container(
@@ -143,6 +148,12 @@ class _Bar extends StatelessWidget {
                                       imageUrl: art,
                                       width: 46,
                                       height: 46,
+                                      memCacheWidth:
+                                          (46 * MediaQuery.devicePixelRatioOf(context))
+                                              .round(),
+                                      memCacheHeight:
+                                          (46 * MediaQuery.devicePixelRatioOf(context))
+                                              .round(),
                                       fit: BoxFit.cover),
                             ),
                           ),
@@ -150,7 +161,7 @@ class _Bar extends StatelessWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: AnimatedSwitcher(
-                            duration: AppMotion.standard,
+                            duration: AppMotion.brisk,
                             switchInCurve: AppMotion.standardCurve,
                             transitionBuilder: (child, anim) => FadeTransition(
                               opacity: anim,
@@ -171,11 +182,12 @@ class _Bar extends StatelessWidget {
                                 Text(prettyTitle(song.title),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: AppText.title(size: 14)),
+                                    style: AppText.trackTitle(size: 14)),
+                                const SizedBox(height: 1),
                                 Text(prettyTitle(song.artist ?? ''),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: AppText.subtitle(size: 12)),
+                                    style: AppText.subtitle(size: 12.5)),
                               ],
                             ),
                           ),
@@ -215,34 +227,18 @@ class _Bar extends StatelessWidget {
                         const SizedBox(width: 4),
                       ],
                     ),
-                    // Progress line — its own Obx so position ticks repaint
-                    // only these 2px, and TweenAnimationBuilder glides between
-                    // the discrete position events instead of stepping.
-                    Positioned(
+                    // Progress line — same gliding 2px line, but painted via a
+                    // CustomPaint inside its own RepaintBoundary. The glide
+                    // still ticks every frame during playback, yet each frame
+                    // is now a trivial rect paint in an isolated layer: no
+                    // FractionallySizedBox relayout, and crucially it no longer
+                    // dirties the GlassContainer's BackdropFilter (which would
+                    // otherwise re-blur the backdrop ~33×/sec while "idle").
+                    const Positioned(
                       left: 0,
                       right: 0,
                       bottom: 0,
-                      child: Obx(() {
-                        final bar = pc.progressBarState.value;
-                        final progress = bar.total.inMilliseconds > 0
-                            ? (bar.current.inMilliseconds /
-                                    bar.total.inMilliseconds)
-                                .clamp(0.0, 1.0)
-                            : 0.0;
-                        return TweenAnimationBuilder<double>(
-                          tween: Tween(end: progress),
-                          duration: const Duration(milliseconds: 600),
-                          curve: Curves.linear,
-                          builder: (_, value, __) => FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: value,
-                            child: Container(
-                              height: 2,
-                              color: colors.accent.value,
-                            ),
-                          ),
-                        );
-                      }),
+                      child: _MiniProgress(),
                     ),
                   ],
                 ),
@@ -255,13 +251,14 @@ class _Bar extends StatelessWidget {
   void _openNowPlaying(BuildContext context) {
     AppHaptics.light();
     Navigator.of(context).push(PageRouteBuilder(
-      transitionDuration: AppMotion.large,
+      transitionDuration: const Duration(milliseconds: 400),
       reverseTransitionDuration: AppMotion.standard,
       pageBuilder: (_, __, ___) => const NowPlayingScreen(),
       transitionsBuilder: (_, anim, __, child) {
-        // Spring-settled rise; the artwork itself morphs via the shared Hero,
-        // so the whole thing reads as one object expanding.
-        final curved = CurvedAnimation(parent: anim, curve: AppMotion.spring);
+        // Decelerate (no overshoot) rise; the artwork itself morphs via the
+        // shared Hero, so the whole thing reads as one object expanding fast
+        // off the line and settling softly — Apple-Music style.
+        final curved = CurvedAnimation(parent: anim, curve: AppMotion.decelerate);
         return FadeTransition(
           opacity: CurvedAnimation(parent: anim, curve: AppMotion.standardCurve),
           child: SlideTransition(
@@ -273,6 +270,58 @@ class _Bar extends StatelessWidget {
       },
     ));
   }
+}
+
+/// The 2px progress line glued to the bottom of the mini-player glass.
+/// Self-contained (const) and isolated in a RepaintBoundary so its per-frame
+/// glide never re-rasters the BackdropFilter above it. Paints a single rect —
+/// no FractionallySizedBox relayout.
+class _MiniProgress extends StatelessWidget {
+  const _MiniProgress();
+
+  @override
+  Widget build(BuildContext context) {
+    final pc = Get.find<PlayerController>();
+    final colors = Get.find<DynamicColorController>();
+    return RepaintBoundary(
+      child: Obx(() {
+        final bar = pc.progressBarState.value;
+        final progress = bar.total.inMilliseconds > 0
+            ? (bar.current.inMilliseconds / bar.total.inMilliseconds)
+                .clamp(0.0, 1.0)
+            : 0.0;
+        final color = colors.accent.value;
+        return TweenAnimationBuilder<double>(
+          tween: Tween(end: progress),
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.linear,
+          builder: (_, value, __) => CustomPaint(
+            painter: _ProgressLinePainter(value, color),
+            child: const SizedBox(height: 2, width: double.infinity),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _ProgressLinePainter extends CustomPainter {
+  final double value;
+  final Color color;
+  const _ProgressLinePainter(this.value, this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (value <= 0) return;
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width * value, size.height),
+      Paint()..color = color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ProgressLinePainter old) =>
+      old.value != value || old.color != color;
 }
 
 /// Obx-wrapped tap target for the mini-player transport buttons.

@@ -54,40 +54,70 @@ class AppRadius {
   static const double pill = 999;
 }
 
+/// Typography scale — one intentional ladder, benchmarked against Apple Music.
+/// Weights step down as text gets more incidental, so the UI reads light and
+/// hierarchical rather than uniformly bold:
+///   heading  w700  — screen + section titles (was w800)
+///   navTitle w700  — collapsed app-bar title
+///   title    w600  — card / sheet / playlist names (was w700)
+///   trackTitle w500 — track names in lists (the densest, lightest tier)
+///   subtitle w400  — artist / secondary (was w500)
+///   button   w600  — actions (was w700, ls 1.2)
+///   navLabel w600  — bottom-nav labels
+///   label    w700  — wide-tracked overlines (e.g. "PLAYLIST")
 class AppText {
-  // Section labels — small caps, wide tracking
+  // Wide-tracked overline (e.g. "PLAYLIST", "NOW PLAYING")
   static TextStyle label({Color color = AppColors.textSecondary}) =>
       GoogleFonts.inter(
         fontSize: 11,
         fontWeight: FontWeight.w700,
         color: color,
-        letterSpacing: 2.0,
+        letterSpacing: 1.8,
       );
 
-  // Primary body titles
-  static TextStyle title({double size = 15, Color color = AppColors.textPrimary}) =>
+  // Screen + section headings
+  static TextStyle heading({double size = 26}) =>
       GoogleFonts.inter(
         fontSize: size,
         fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+        letterSpacing: -0.4,
+      );
+
+  // Collapsed navigation / app-bar title
+  static TextStyle navTitle({Color color = AppColors.textPrimary}) =>
+      GoogleFonts.inter(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        color: color,
+        letterSpacing: -0.3,
+      );
+
+  // Card / sheet / playlist titles — semibold
+  static TextStyle title({double size = 15, Color color = AppColors.textPrimary}) =>
+      GoogleFonts.inter(
+        fontSize: size,
+        fontWeight: FontWeight.w600,
         color: color,
         letterSpacing: -0.1,
       );
 
-  // Secondary subtitle / artist
-  static TextStyle subtitle({double size = 12, Color color = AppColors.textSecondary}) =>
+  // Track names in lists — lighter than card titles for elegant, scannable rows
+  static TextStyle trackTitle(
+          {double size = 15.5, Color color = AppColors.textPrimary}) =>
       GoogleFonts.inter(
         fontSize: size,
         fontWeight: FontWeight.w500,
         color: color,
+        letterSpacing: -0.1,
       );
 
-  // Screen heading
-  static TextStyle heading({double size = 26}) =>
+  // Secondary subtitle / artist — regular weight, lower emphasis
+  static TextStyle subtitle({double size = 13, Color color = AppColors.textSecondary}) =>
       GoogleFonts.inter(
         fontSize: size,
-        fontWeight: FontWeight.w800,
-        color: AppColors.textPrimary,
-        letterSpacing: -0.5,
+        fontWeight: FontWeight.w400,
+        color: color,
       );
 
   // Caption / metadata
@@ -98,13 +128,22 @@ class AppText {
         color: color,
       );
 
+  // Bottom-navigation labels
+  static TextStyle navLabel({Color color = AppColors.textPrimary}) =>
+      GoogleFonts.inter(
+        fontSize: 10.5,
+        fontWeight: FontWeight.w600,
+        color: color,
+        letterSpacing: 0.1,
+      );
+
   // Button text
   static TextStyle button({Color color = AppColors.textPrimary}) =>
       GoogleFonts.inter(
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
         color: color,
-        letterSpacing: 1.2,
+        letterSpacing: 0.2,
       );
 }
 

@@ -115,8 +115,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
           sliver: SliverToBoxAdapter(
             child: SectionHeader(
               title: 'Playlists',
-              actionLabel: 'Import',
-              onAction: () => showImportPlaylistSheet(context),
+              action: GlassPillButton(
+                icon: Icons.add_rounded,
+                label: 'Import',
+                onTap: () => showImportPlaylistSheet(context),
+              ),
             ),
           ),
         ),

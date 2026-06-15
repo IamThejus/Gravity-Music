@@ -62,7 +62,49 @@ class HomeScreen extends StatelessWidget {
       onRefresh: () => home.loadMixes(forceRefresh: true),
       child: CustomScrollView(
         slivers: [
-          SliverToBoxAdapter(child: _Header()),
+          // ── Collapsing large title (Apple-Music large-title behaviour) ──
+          // "Gravity" stays visible while scrolling: large at rest, shrinking
+          // into a pinned nav title on scroll. The greeting fades out with the
+          // FlexibleSpaceBar background, so brand presence + orientation are
+          // always maintained without a heavy sticky header.
+          SliverAppBar(
+            pinned: true,
+            expandedHeight: 124,
+            backgroundColor: AppColors.canvas,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            automaticallyImplyLeading: false,
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.screenMargin),
+                child: GlassIconButton(
+                  icon: Icons.favorite_rounded,
+                  iconColor: AppColors.accent,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const LikedSongsScreen())),
+                ),
+              ),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: const EdgeInsetsDirectional.only(
+                  start: AppSpacing.screenMargin, bottom: 14),
+              expandedTitleScale: 1.85, // navTitle 17 → ~31 expanded
+              title: Text('Gravity', style: AppText.navTitle()),
+              background: SafeArea(
+                bottom: false,
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                        left: AppSpacing.screenMargin, bottom: 46),
+                    child: Text(greetingForNow(),
+                        style: AppText.subtitle(size: 15)),
+                  ),
+                ),
+              ),
+            ),
+          ),
           // ── Recently Played ──────────────────────────────────────────
           SliverToBoxAdapter(
             child: Obx(() {
@@ -134,39 +176,6 @@ class HomeScreen extends StatelessWidget {
           })),
           const SliverToBoxAdapter(
               child: SizedBox(height: AppSpacing.bottomDock)),
-        ],
-      ),
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-          AppSpacing.screenMargin,
-          MediaQuery.of(context).padding.top + 16,
-          AppSpacing.screenMargin,
-          AppSpacing.stackMd),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(greetingForNow(), style: AppText.subtitle(size: 15)),
-                const SizedBox(height: 2),
-                Text('Gravity', style: AppText.heading(size: 32)),
-              ],
-            ),
-          ),
-          GlassIconButton(
-            icon: Icons.favorite_rounded,
-            iconColor: AppColors.accent,
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const LikedSongsScreen())),
-          ),
         ],
       ),
     );

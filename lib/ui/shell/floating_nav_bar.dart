@@ -49,7 +49,7 @@ class FloatingNavBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.stackLg),
       child: GlassContainer(
         radius: AppRadius.pill,
-        blur: 30,
+        blur: 24,
         shadow: kGlassShadow,
         fill: AppColors.glassFill,
         padding: const EdgeInsets.all(8),
@@ -116,7 +116,7 @@ class _NavItem extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         AnimatedScale(
-          scale: selected ? 1.08 : 0.9,
+          scale: selected ? 1.06 : 0.92,
           duration: AppMotion.standard,
           curve: AppMotion.spring,
           child: Icon(
@@ -133,13 +133,12 @@ class _NavItem extends StatelessWidget {
             duration: AppMotion.fast,
             curve: AppMotion.standardCurve,
             child: selected
+                // Dedicated nav label: 10.5/w600 (was 9/w700) — more legible
+                // and less cramped, with balanced spacing under the icon so the
+                // icon+label read as one centred unit.
                 ? Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      dest.label,
-                      style: AppText.caption(color: Colors.white).copyWith(
-                          fontSize: 9, fontWeight: FontWeight.w700),
-                    ),
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(dest.label, style: AppText.navLabel()),
                   )
                 : const SizedBox(width: 0, height: 0),
           ),

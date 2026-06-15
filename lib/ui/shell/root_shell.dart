@@ -1,11 +1,15 @@
 // ui/shell/root_shell.dart
 //
-// The app's root scaffold. All tabs stay built (state/scroll preserved) and
-// cross-fade between each other via per-screen AnimatedOpacity — the same
-// state preservation an IndexedStack gave, but with a soft transition instead
-// of a hard cut. The floating mini-player + nav dock are layered above the
-// content (DESIGN.md → "Glass Layer floating above the content stack").
-// Screens add AppSpacing.bottomDock padding so nothing hides behind the dock.
+// The app's root scaffold. All tabs stay mounted in an IndexedStack
+// (scroll/state preserved), but ONLY the active screen is painted — the prior
+// Stack+AnimatedOpacity approach kept every screen painting and, during a
+// switch, composited two full blurred screens at once (the #1 measured jank
+// source). The soft transition feel is preserved with a short fade-through
+// applied to the *incoming* screen only (the same language as the app's page
+// pushes), so two blurred screens are never composited simultaneously.
+// The floating mini-player + nav dock are layered above the content
+// (DESIGN.md → "Glass Layer floating above the content stack"). Screens add
+// AppSpacing.bottomDock padding so nothing hides behind the dock.
 
 import 'package:flutter/material.dart';
 
@@ -25,21 +29,45 @@ class RootShell extends StatefulWidget {
   State<RootShell> createState() => _RootShellState();
 }
 
-class _RootShellState extends State<RootShell> {
+class _RootShellState extends State<RootShell>
+    with SingleTickerProviderStateMixin {
   int _index = 0;
 
-  // Built once and kept alive by the IndexedStack.
+  // Built once and kept alive by the IndexedStack (state/scroll preserved).
+  // Each is wrapped in a RepaintBoundary so a repaint in one tab can never
+  // dirty another, and so the active screen rasterizes into its own layer.
   final _screens = const [
-    HomeScreen(),
-    SearchScreen(),
-    LibraryScreen(),
-    QueueScreen(),
+    RepaintBoundary(child: HomeScreen()),
+    RepaintBoundary(child: SearchScreen()),
+    RepaintBoundary(child: LibraryScreen()),
+    RepaintBoundary(child: QueueScreen()),
   ];
+
+  // Drives the incoming-screen fade. Rests at 1.0 (Opacity short-circuits the
+  // saveLayer at exactly 1.0, so settled tabs cost nothing) and replays 0→1 on
+  // each switch. A short fade only — tabs are peer-level, so no scale (peers
+  // shouldn't "zoom"); 160ms lands at Spotify-level responsiveness while
+  // keeping a whisper of Gravity's softness.
+  late final AnimationController _transition = AnimationController(
+    vsync: this,
+    duration: AppMotion.micro,
+    value: 1.0,
+  );
+  late final Animation<double> _fade =
+      _transition.drive(CurveTween(curve: AppMotion.standardCurve));
 
   void _onTap(int i) {
     // Tapping "Queue" while something plays could also open Now Playing;
     // we keep it as a full tab here for discoverability.
+    if (i == _index) return;
     setState(() => _index = i);
+    _transition.forward(from: 0.0);
+  }
+
+  @override
+  void dispose() {
+    _transition.dispose();
+    super.dispose();
   }
 
   @override
@@ -49,19 +77,20 @@ class _RootShellState extends State<RootShell> {
       extendBody: true,
       body: Stack(
         children: [
-          // Every screen stays mounted (scroll/state preserved); only opacity
-          // animates, so switching tabs cross-fades instead of hard-cutting.
-          // Opacity-0 children skip painting, so off-screen tabs cost nothing.
-          for (int i = 0; i < _screens.length; i++)
-            AnimatedOpacity(
-              opacity: _index == i ? 1.0 : 0.0,
-              duration: AppMotion.standard,
-              curve: AppMotion.standardCurve,
-              child: IgnorePointer(
-                ignoring: _index != i,
-                child: _screens[i],
+          // Only the selected IndexedStack child paints; the others stay
+          // mounted (scroll/controllers intact) but are not rastered. The
+          // fade+scale runs on this single subtree during a switch, so at most
+          // ONE screen is ever composited at partial opacity.
+          Positioned.fill(
+            child: FadeTransition(
+              opacity: _fade,
+              child: IndexedStack(
+                index: _index,
+                sizing: StackFit.expand,
+                children: _screens,
               ),
             ),
+          ),
           // Floating dock: mini-player stacked over the nav, both suspended
           // off the bottom edge.
           Positioned(

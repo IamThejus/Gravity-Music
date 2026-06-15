@@ -21,62 +21,6 @@ class ProgressBarState {
 
 enum PlayButtonState { paused, playing, loading }
 
-/// Immutable snapshot of the player's observable state.
-///
-/// Consolidates the individual `Rx<…>` fields below into a single value that
-/// can be read or subscribed to atomically. This avoids the "play button
-/// shows playing but title is still old" race that the multi-field design
-/// allows between events.
-///
-/// Step 3 is additive: the existing `Rx<…>` fields keep working and are
-/// updated in parallel. UI consumers can opt into `playerState` when
-/// convenient; nothing is forced to migrate.
-class PlayerState {
-  final MediaItem? currentSong;
-  final PlayButtonState buttonState;
-  final ProgressBarState progressBarState;
-  final String? errorMessage;
-  final bool isLoopEnabled;
-  final bool isShuffleEnabled;
-
-  const PlayerState({
-    this.currentSong,
-    this.buttonState = PlayButtonState.paused,
-    this.progressBarState = const ProgressBarState(
-      current: Duration.zero,
-      buffered: Duration.zero,
-      total: Duration.zero,
-    ),
-    this.errorMessage,
-    this.isLoopEnabled = false,
-    this.isShuffleEnabled = false,
-  });
-
-  /// Copy with explicit clearing semantics for nullable fields.
-  /// Pass `clearSong: true` to set currentSong to null; passing
-  /// `currentSong: null` (the default) means "keep the existing value".
-  /// Same pattern for errorMessage / clearError.
-  PlayerState copyWith({
-    MediaItem? currentSong,
-    bool clearSong = false,
-    PlayButtonState? buttonState,
-    ProgressBarState? progressBarState,
-    String? errorMessage,
-    bool clearError = false,
-    bool? isLoopEnabled,
-    bool? isShuffleEnabled,
-  }) {
-    return PlayerState(
-      currentSong: clearSong ? null : (currentSong ?? this.currentSong),
-      buttonState: buttonState ?? this.buttonState,
-      progressBarState: progressBarState ?? this.progressBarState,
-      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
-      isLoopEnabled: isLoopEnabled ?? this.isLoopEnabled,
-      isShuffleEnabled: isShuffleEnabled ?? this.isShuffleEnabled,
-    );
-  }
-}
-
 class PlayerController extends GetxController {
   final AudioHandler audioHandler;
   PlayerController({required this.audioHandler});
@@ -101,11 +45,6 @@ class PlayerController extends GetxController {
   final sleepTimerEnd      = Rxn<DateTime>();
   Timer? _sleepTimer;
 
-  /// Consolidated immutable playback-state snapshot.
-  /// Mirrors the individual `Rx<…>` fields above. UI may subscribe to either;
-  /// they are kept in sync by the listeners in onInit(). See [PlayerState].
-  final playerState = Rx<PlayerState>(const PlayerState());
-
   /// Watermark-driven queue refill. Created in onInit, stopped in onClose.
   late final AutoplayOrchestrator _autoplay;
 
@@ -115,10 +54,6 @@ class PlayerController extends GetxController {
 
     audioHandler.mediaItem.listen((item) {
       currentSong.value = item;
-      playerState.value = playerState.value.copyWith(
-        currentSong: item,
-        clearSong: item == null,
-      );
       if (item != null) {
         isCurrentSongLiked.value = LibraryService.isLiked(item.id);
         _saveSession();
@@ -137,18 +72,14 @@ class PlayerController extends GetxController {
         newButtonState = PlayButtonState.playing;
       }
       buttonState.value = newButtonState;
-      playerState.value =
-          playerState.value.copyWith(buttonState: newButtonState);
     });
 
     AudioService.position.listen((pos) {
       final duration = currentSong.value?.duration ?? Duration.zero;
       final buffered = audioHandler.playbackState.value.bufferedPosition;
-      final newBar = ProgressBarState(
+      progressBarState.value = ProgressBarState(
         current: pos, buffered: buffered, total: duration,
       );
-      progressBarState.value = newBar;
-      playerState.value = playerState.value.copyWith(progressBarState: newBar);
     });
 
     final q = Hive.box('AppPrefs').get('streamingQuality') ?? 1;
@@ -194,8 +125,6 @@ class PlayerController extends GetxController {
 
   void toggleLoop() {
     isLoopEnabled.value = !isLoopEnabled.value;
-    playerState.value =
-        playerState.value.copyWith(isLoopEnabled: isLoopEnabled.value);
     audioHandler.setRepeatMode(
       isLoopEnabled.value
           ? AudioServiceRepeatMode.one
@@ -205,8 +134,6 @@ class PlayerController extends GetxController {
 
   void toggleShuffle() {
     isShuffleEnabled.value = !isShuffleEnabled.value;
-    playerState.value =
-        playerState.value.copyWith(isShuffleEnabled: isShuffleEnabled.value);
     audioHandler.setShuffleMode(
       isShuffleEnabled.value
           ? AudioServiceShuffleMode.all
@@ -221,7 +148,6 @@ class PlayerController extends GetxController {
   void syncShuffleDisabled() {
     if (!isShuffleEnabled.value) return;
     isShuffleEnabled.value = false;
-    playerState.value = playerState.value.copyWith(isShuffleEnabled: false);
   }
 
   void toggleQuality() {
@@ -271,7 +197,6 @@ class PlayerController extends GetxController {
     Duration? duration,
   }) async {
     errorMessage.value = null;
-    playerState.value = playerState.value.copyWith(clearError: true);
     final song = MediaItem(
       id: videoId,
       title: title ?? videoId,
@@ -446,7 +371,6 @@ class PlayerController extends GetxController {
 
   void notifyError(String msg) {
     errorMessage.value = msg;
-    playerState.value = playerState.value.copyWith(errorMessage: msg);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

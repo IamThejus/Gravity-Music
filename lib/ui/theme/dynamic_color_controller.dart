@@ -54,6 +54,16 @@ class DynamicColorController extends GetxController {
       return;
     }
 
+    // PaletteGenerator must run on the UI isolate (it needs a decoded
+    // ui.Image), and its decode+quantize is a several-ms synchronous spike.
+    // Defer it past the track-change / Now-Playing-open animation so that
+    // spike never collides with an animating frame. Results are cached per
+    // id, so this runs at most once per track; the small delay is invisible
+    // (the wash fades in over a 450ms AnimatedContainer regardless). Colors
+    // and parameters are unchanged, so the palette result is identical.
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (id != _currentId) return; // user moved on while we waited
+
     try {
       final palette = await PaletteGenerator.fromImageProvider(
         CachedNetworkImageProvider(ThumbUtil.get(artUrl, ThumbnailSize.tile)),

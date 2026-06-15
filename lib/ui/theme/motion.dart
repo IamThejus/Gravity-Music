@@ -23,7 +23,9 @@ class AppMotion {
   AppMotion._();
 
   // ── Durations ──────────────────────────────────────────────────────────────
+  static const Duration micro = Duration(milliseconds: 160); // tab switch / instant peers
   static const Duration fast = Duration(milliseconds: 200);
+  static const Duration brisk = Duration(milliseconds: 230); // mini-player track cross-fades
   static const Duration standard = Duration(milliseconds: 300);
   static const Duration large = Duration(milliseconds: 450);
   static const Duration xlarge = Duration(milliseconds: 500);
@@ -33,8 +35,14 @@ class AppMotion {
   static const Curve emphasized = Curves.easeInOutCubic;
   static const Curve entrance = Curves.fastOutSlowIn;
 
-  /// A restrained spring: tiny overshoot then settle. Used for the nav pill
-  /// glide and the Now-Playing expansion so they feel alive but never bouncy.
+  /// Apple-style "emphasized decelerate" (Material 3): high initial velocity,
+  /// long soft settle, NO overshoot. Used for major entrances like the
+  /// Now-Playing expansion — fast off the line, smooth to rest.
+  static const Curve decelerate = Cubic(0.05, 0.7, 0.1, 1.0);
+
+  /// A restrained spring: tiny overshoot then settle. Reserved for small
+  /// playful elements (the nav pill glide); no longer used for screen-scale
+  /// transitions, where the overshoot reads as heaviness.
   static const Curve spring = Cubic(0.34, 1.15, 0.64, 1.0);
 }
 

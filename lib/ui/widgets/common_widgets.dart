@@ -16,11 +16,16 @@ class SectionHeader extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
 
+  /// Optional trailing widget (e.g. a [GlassPillButton]). Takes precedence
+  /// over [actionLabel] when provided.
+  final Widget? action;
+
   const SectionHeader({
     super.key,
     required this.title,
     this.actionLabel,
     this.onAction,
+    this.action,
   });
 
   @override
@@ -29,11 +34,12 @@ class SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(
           AppSpacing.screenMargin, 0, AppSpacing.screenMargin, AppSpacing.stackSm + 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(child: Text(title, style: AppText.heading(size: 20))),
-          if (actionLabel != null)
+          if (action != null)
+            action!
+          else if (actionLabel != null)
             GestureDetector(
               onTap: () {
                 AppHaptics.selection();
@@ -43,6 +49,51 @@ class SectionHeader extends StatelessWidget {
                   style: AppText.caption(color: AppColors.textSecondaryHi)),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Small, lightweight pill action — translucent glass fill + hairline border,
+/// an optional leading icon, and a press-scale. Clearly reads as tappable
+/// (unlike plain text) while staying visually quiet. ~34dp tall.
+class GlassPillButton extends StatelessWidget {
+  final IconData? icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const GlassPillButton({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      pressedScale: 0.95,
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 13),
+        decoration: BoxDecoration(
+          color: AppColors.glassFill,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(color: AppColors.glassBorder, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: AppColors.textPrimary),
+              const SizedBox(width: 5),
+            ],
+            Text(label,
+                style: AppText.button(color: AppColors.textPrimary)
+                    .copyWith(letterSpacing: 0)),
+          ],
+        ),
       ),
     );
   }
@@ -74,6 +125,16 @@ class ArtImage extends StatelessWidget {
     final bool fill = !size.isFinite;
     final double iconSize = fill ? 44 : size * 0.38;
 
+    // Decode the artwork at (roughly) the resolution it's actually drawn at,
+    // not the source resolution. ThumbUtil already picks the right URL tier;
+    // this caps the *decoded bitmap* too, cutting decode time + image-cache
+    // memory (the Library grid's measured scroll jank). For grid tiles
+    // (size == infinity) we derive the on-screen width from a 2-column layout.
+    final double dpr = MediaQuery.devicePixelRatioOf(context);
+    final double logicalW =
+        fill ? (MediaQuery.sizeOf(context).width - 56) / 2 : size;
+    final int cacheW = (logicalW * dpr).round().clamp(1, 4096);
+
     final container = Container(
       width: fill ? double.infinity : size,
       height: fill ? double.infinity : size,
@@ -81,7 +142,10 @@ class ArtImage extends StatelessWidget {
         borderRadius: br,
         color: AppColors.card,
         boxShadow: const [
-          BoxShadow(color: Color(0x33FFFFFF), blurRadius: 18, spreadRadius: -8),
+          // Subtle inner glow so art never vanishes into the black canvas
+          // (Gravity signature). Softened 0x33→0x22 so it reads as a halo,
+          // not a heavy ring.
+          BoxShadow(color: Color(0x22FFFFFF), blurRadius: 16, spreadRadius: -8),
         ],
       ),
       clipBehavior: Clip.antiAlias,
@@ -92,6 +156,8 @@ class ArtImage extends StatelessWidget {
           : CachedNetworkImage(
               imageUrl: url,
               fit: fit,
+              memCacheWidth: cacheW,
+              memCacheHeight: cacheW,
               placeholder: (_, __) => Container(color: AppColors.card),
               errorWidget: (_, __, ___) => Center(
                 child: Icon(Icons.music_note_rounded,
@@ -190,12 +256,14 @@ class TrackTile extends StatelessWidget {
       onTap: onTap,
       pressedScale: 0.98,
       child: Padding(
+        // A touch more vertical air (8→10) for Apple-Music breathing room
+        // without inflating the row; keeps density, improves scanability.
         padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.screenMargin, vertical: 8),
+            horizontal: AppSpacing.screenMargin, vertical: 10),
         child: Row(
           children: [
             ArtImage(url: imageUrl, size: 52),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,12 +272,12 @@ class TrackTile extends StatelessWidget {
                   Text(prettyTitle(title),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppText.title(
-                          size: 15,
+                      // Medium weight (not bold) — lighter, more elegant rows.
+                      style: AppText.trackTitle(
                           color: active
                               ? AppColors.white
                               : AppColors.textPrimary)),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(prettyTitle(subtitle),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

@@ -75,12 +75,22 @@ class _PlayerBody extends StatefulWidget {
 
 class _PlayerBodyState extends State<_PlayerBody>
     with SingleTickerProviderStateMixin {
-  // One controller drives the whole entrance; each row reveals over its own
-  // interval so the controls cascade in after the artwork has morphed in.
+  // One controller drives a single GROUPED reveal: the top bar and the whole
+  // control cluster fade + rise in unison (not a 5-stage cascade) while the
+  // artwork morphs in via the Hero. Presenting the controls together — rather
+  // than staggering them in over 600ms — is the Apple-Music move: the screen
+  // reads "ready" almost immediately instead of waiting for the last row.
+  // 300ms total = a ~60ms lead (Interval start 0.2) so it begins as the art
+  // lands, then a 240ms decelerate reveal.
   late final AnimationController _entrance = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 700),
+    duration: const Duration(milliseconds: 300),
   )..forward();
+
+  late final Animation<double> _content = CurvedAnimation(
+    parent: _entrance,
+    curve: const Interval(0.2, 1.0, curve: AppMotion.decelerate),
+  );
 
   @override
   void dispose() {
@@ -88,19 +98,16 @@ class _PlayerBodyState extends State<_PlayerBody>
     super.dispose();
   }
 
-  /// Fade + gentle rise over [start]…[end] of the entrance timeline.
-  Widget _rise(double start, double end, Widget child) {
-    final anim = CurvedAnimation(
-      parent: _entrance,
-      curve: Interval(start, end, curve: AppMotion.standardCurve),
-    );
+  /// Fade + gentle 8px rise, shared by every revealed group so they move as
+  /// one (a grouped reveal, not a cascade).
+  Widget _reveal(Widget child) {
     return AnimatedBuilder(
-      animation: anim,
+      animation: _content,
       child: child,
       builder: (_, c) => Opacity(
-        opacity: anim.value.clamp(0.0, 1.0),
+        opacity: _content.value.clamp(0.0, 1.0),
         child: Transform.translate(
-          offset: Offset(0, (1 - anim.value) * 14),
+          offset: Offset(0, (1 - _content.value.clamp(0.0, 1.0)) * 8),
           child: c,
         ),
       ),
@@ -114,7 +121,7 @@ class _PlayerBodyState extends State<_PlayerBody>
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenMargin),
       child: Column(
         children: [
-          _rise(0.0, 0.4, _TopBar()),
+          _reveal(_TopBar()),
           // ── Artwork (flexible — shrinks on short heights, no overflow) ─
           // Not staggered: it morphs in from the mini-player via the Hero.
           Expanded(
@@ -129,14 +136,18 @@ class _PlayerBodyState extends State<_PlayerBody>
                     aspectRatio: 1,
                     child: Hero(
                       tag: kNowPlayingArtTag,
+                      // Match the mini-player Hero: straight-line morph (no arc)
+                      // so push and pop both expand/contract the art directly.
+                      createRectTween: (begin, end) =>
+                          RectTween(begin: begin, end: end),
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(AppRadius.xl),
                           boxShadow: const [
                             BoxShadow(
                                 color: Color(0x66000000),
-                                blurRadius: 60,
-                                offset: Offset(0, 24)),
+                                blurRadius: 44,
+                                offset: Offset(0, 20)),
                           ],
                         ),
                         clipBehavior: Clip.antiAlias,
@@ -146,7 +157,14 @@ class _PlayerBodyState extends State<_PlayerBody>
                                 child: const Icon(Icons.music_note_rounded,
                                     size: 80, color: AppColors.textTertiary))
                             : CachedNetworkImage(
-                                imageUrl: art, fit: BoxFit.cover),
+                                imageUrl: art,
+                                fit: BoxFit.cover,
+                                // Artwork is drawn at most ~screen-width; cap the
+                                // decode there instead of the source resolution.
+                                memCacheWidth: (MediaQuery.sizeOf(context).width *
+                                        MediaQuery.devicePixelRatioOf(context))
+                                    .round()
+                                    .clamp(1, 2048)),
                       ),
                     ),
                   );
@@ -154,50 +172,55 @@ class _PlayerBodyState extends State<_PlayerBody>
               ),
             ),
           ),
-          // ── Title + artist + like ────────────────────────────────────
-          _rise(
-            0.3,
-            0.7,
-            Obx(() {
-              final song = pc.currentSong.value;
-              return Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(prettyTitle(song?.title ?? 'Nothing playing'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.heading(size: 26)),
-                        const SizedBox(height: 4),
-                        Text(prettyTitle(song?.artist ?? ''),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.subtitle(
-                                size: 16, color: AppColors.textSecondaryHi)),
-                      ],
-                    ),
-                  ),
-                  Obx(() => GlassIconButton(
-                        icon: pc.isCurrentSongLiked.value
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        iconColor: pc.isCurrentSongLiked.value
-                            ? AppColors.accent
-                            : Colors.white,
-                        onTap: pc.toggleLike,
-                      )),
-                ],
-              );
-            }),
+          // ── Controls cluster — revealed as ONE group (title, seek bar,
+          //    transport, secondary actions move in unison) ───────────────
+          _reveal(
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Obx(() {
+                  final song = pc.currentSong.value;
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(prettyTitle(song?.title ?? 'Nothing playing'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.heading(size: 26)),
+                            const SizedBox(height: 4),
+                            Text(prettyTitle(song?.artist ?? ''),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.subtitle(
+                                    size: 16,
+                                    color: AppColors.textSecondaryHi)),
+                          ],
+                        ),
+                      ),
+                      Obx(() => GlassIconButton(
+                            icon: pc.isCurrentSongLiked.value
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            iconColor: pc.isCurrentSongLiked.value
+                                ? AppColors.accent
+                                : Colors.white,
+                            onTap: pc.toggleLike,
+                          )),
+                    ],
+                  );
+                }),
+                const SizedBox(height: AppSpacing.stackMd),
+                _SeekBar(pc: pc),
+                const SizedBox(height: AppSpacing.stackSm),
+                _Controls(pc: pc),
+                const SizedBox(height: AppSpacing.stackMd),
+                _SecondaryBar(pc: pc),
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.stackMd),
-          _rise(0.42, 0.82, _SeekBar(pc: pc)),
-          const SizedBox(height: AppSpacing.stackSm),
-          _rise(0.5, 0.9, _Controls(pc: pc)),
-          const SizedBox(height: AppSpacing.stackMd),
-          _rise(0.58, 1.0, _SecondaryBar(pc: pc)),
           const SizedBox(height: AppSpacing.gutter),
         ],
       ),
@@ -566,7 +589,7 @@ class _LyricsOverlayState extends State<_LyricsOverlay> {
       return Positioned.fill(
         child: GlassContainer(
           radius: 0,
-          blur: 35,
+          blur: 28,
           border: false,
           fill: Colors.black.withOpacity(0.55),
           child: Column(
@@ -637,7 +660,7 @@ void showQueueSheet(BuildContext context) {
       maxChildSize: 0.95,
       builder: (_, scrollCtrl) => GlassContainer(
         radius: AppRadius.xl,
-        blur: 30,
+        blur: 24,
         fill: AppColors.card.withOpacity(0.72),
         child: Column(
           children: [
@@ -726,7 +749,7 @@ void showAddToPlaylistSheet(BuildContext context, MediaItem song) {
         final playlists = LibraryService.getPlaylists();
         return GlassContainer(
           radius: AppRadius.xl,
-          blur: 30,
+          blur: 24,
           fill: AppColors.card.withOpacity(0.72),
           padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),
           child: Column(

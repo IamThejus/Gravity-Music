@@ -37,6 +37,9 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
+# Packaging output (linux/packaging/package.sh)
+/dist/
+
 # Android related
 **/android/**/gradle-wrapper.jar
 **/android/.gradle

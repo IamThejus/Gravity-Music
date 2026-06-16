@@ -22,9 +22,8 @@ import 'dart:isolate';
 import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
-
 import '../models/hm_streaming_data.dart';
+import 'app_paths.dart';
 import 'background_task.dart';
 import 'download_service.dart';
 import 'library_service.dart';
@@ -103,7 +102,7 @@ class PlaylistDownloadService {
   // ── Download a single track into the playlist store ──────────────────────────
 
   static Future<String> _dir() async {
-    final base = await getApplicationDocumentsDirectory();
+    final base = await appDataDirectory();
     final dir = Directory('${base.path}/playlist_downloads');
     if (!dir.existsSync()) dir.createSync(recursive: true);
     return dir.path;

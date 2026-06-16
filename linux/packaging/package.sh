@@ -50,10 +50,22 @@ cp -r "$BUNDLE/." "$STAGE/opt/$APP_NAME/"
 chmod 755 "$STAGE/opt/$APP_NAME/$BIN_NAME"
 
 # Launcher wrapper on PATH.
+#
+# The app uses audio_service + MPRIS, which require a D-Bus *session* bus during
+# AudioService.init(); without one the window stays blank. Some Wayland sessions
+# (e.g. a minimal Hyprland/Sway setup) export no session bus to launcher-spawned
+# apps. If none is reachable, start a private one with dbus-run-session so the
+# app still launches (MPRIS then lives on that bus). When a real session bus
+# exists it is used as-is, so MPRIS stays visible system-wide.
 install -d "$STAGE/usr/bin"
 cat > "$STAGE/usr/bin/$APP_NAME" <<EOF
 #!/bin/sh
-exec /opt/$APP_NAME/$BIN_NAME "\$@"
+BIN=/opt/$APP_NAME/$BIN_NAME
+if [ -n "\$DBUS_SESSION_BUS_ADDRESS" ] || [ -S "\${XDG_RUNTIME_DIR:-/run/user/\$(id -u)}/bus" ]; then
+  exec "\$BIN" "\$@"
+else
+  exec dbus-run-session -- "\$BIN" "\$@"
+fi
 EOF
 chmod 755 "$STAGE/usr/bin/$APP_NAME"
 
@@ -116,6 +128,7 @@ fpm "${FPM_COMMON[@]}" \
   --architecture amd64 \
   --depends "libmpv2 | libmpv1" \
   --depends "libgtk-3-0" \
+  --depends "dbus" \
   --deb-no-default-config-files \
   -p "$OUT/${APP_NAME}_${VERSION}_amd64.deb" \
   .
@@ -128,6 +141,7 @@ fpm "${FPM_COMMON[@]}" \
   --architecture x86_64 \
   --depends "mpv-libs" \
   --depends "gtk3" \
+  --depends "dbus" \
   -p "$OUT/${APP_NAME}-${VERSION}-1.x86_64.rpm" \
   .
 

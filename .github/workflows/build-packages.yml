@@ -1,8 +1,8 @@
-name: Build Linux Packages
+name: Build Packages
 
-# Builds .deb and .rpm packages for the Linux desktop app.
-# - On every push/PR touching the app: builds and uploads packages as artifacts.
-# - On a version tag (v*): also attaches the packages to a GitHub Release.
+# Builds the Linux desktop packages (.deb/.rpm) and the Android APK.
+# - On every push/PR touching the app: builds and uploads each as artifacts.
+# - On a version tag (v*): also attaches all of them to a GitHub Release.
 
 on:
   push:
@@ -13,6 +13,7 @@ on:
     paths:
       - 'lib/**'
       - 'linux/**'
+      - 'android/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
       - 'assets/app_icon.png'
@@ -21,6 +22,7 @@ on:
     paths:
       - 'lib/**'
       - 'linux/**'
+      - 'android/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
       - '.github/workflows/build-packages.yml'
@@ -80,5 +82,60 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  android:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write   # required to attach the APK to the Release on v* tags
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.2
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build release APK
+        # Release build signs with the debug key (android/app/build.gradle.kts),
+        # so it installs via sideload. It is NOT Play-Store-signed.
+        run: flutter build apk --release
+
+      - name: Name the APK with the version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(grep -E '^version:' pubspec.yaml | head -1 | sed -E 's/version:[[:space:]]*//; s/\+.*//')"
+          fi
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/gravity-music-${VERSION}.apk"
+          ls -la dist
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gravity-music-android-apk
+          path: dist/*.apk
+          if-no-files-found: error
+
+      - name: Attach APK to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,7 +1,7 @@
 name: saragama
 description: A modern, minimal YouTube audio player.
 publish_to: 'none'
-version: 1.1.0+2
+version: 1.2.2+3
 
 environment:
   sdk: ">=3.1.5 <4.0.0"

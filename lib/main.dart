@@ -1,8 +1,13 @@
 // main.dart
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
+import 'package:audio_service_mpris/audio_service_mpris.dart';
+import 'services/app_paths.dart';
 import 'controllers/download_controller.dart';
 import 'controllers/import_controller.dart';
 import 'controllers/lyrics_controller.dart';
@@ -18,8 +23,47 @@ import 'ui/theme/motion.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ── Desktop playback backend ──────────────────────────────────────────────
+  // just_audio has no native Linux/Windows implementation; media_kit (libmpv)
+  // provides one. Self-guards by platform (no-op on Android/iOS), but the
+  // explicit guard keeps intent clear. Must run before any AudioPlayer is
+  // constructed (i.e. before initAudioService()).
+  if (Platform.isLinux || Platform.isWindows) {
+    // media_kit runs libmpv with `cache-on-disk=yes` hardcoded, whose on-disk
+    // cache lives in $XDG_CACHE_HOME/mpv (~/.cache/mpv). The embedded libmpv
+    // does NOT create that directory itself (unlike the mpv CLI), so when it's
+    // missing mpv logs "Failed to create file cache" and the subsequent
+    // seek(0) fails — which breaks skip/auto-advance/loop. Pre-create it.
+    ensureMpvCacheDir();
+    JustAudioMediaKit.ensureInitialized();
+  }
+
+  // ── Linux MPRIS system integration ────────────────────────────────────────
+  // Registers audio_service's Linux platform (media keys, lock screen, system
+  // media widget). Synchronous, and MUST be called before AudioService.init().
+  // canControl must be true or the per-action flags are forced false.
+  if (Platform.isLinux) {
+    AudioServiceMpris.init(
+      dBusName: 'gravity_music',
+      identity: 'Gravity Music',
+      // Links MPRIS to the installed .desktop entry so system media widgets
+      // show the app icon/name. Matches the GTK application-id and the
+      // installed desktop file basename (com.example.saraharmony.desktop).
+      desktopEntry: 'com.example.saraharmony',
+      canControl: true,
+      canPlay: true,
+      canPause: true,
+      canGoNext: true,
+      canGoPrevious: true,
+    );
+  }
+
   // ── Hive init (same boxes as HarmonyMusic) ────────────────────────────────
-  await Hive.initFlutter();
+  // Hive.initFlutter() resolves its path via getApplicationDocumentsDirectory(),
+  // which throws on Linux desktop (xdg-user-dir). Init explicitly from the
+  // platform-correct base dir instead — on mobile this is the documents dir,
+  // identical to initFlutter()'s behaviour.
+  Hive.init((await appDataDirectory()).path);
   await Hive.openBox('AppPrefs');
   await Hive.openBox('SongsUrlCache');
   await Hive.openBox('LibraryBox');

@@ -1,0 +1,82 @@
+name: Build Linux Packages
+
+# Builds .deb and .rpm packages for the Linux desktop app.
+# - On every push/PR touching the app: builds and uploads packages as artifacts.
+# - On a version tag (v*): also attaches the packages to a GitHub Release.
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+    paths:
+      - 'lib/**'
+      - 'linux/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - 'assets/app_icon.png'
+      - '.github/workflows/build-packages.yml'
+  pull_request:
+    paths:
+      - 'lib/**'
+      - 'linux/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/build-packages.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev \
+            imagemagick rpm
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.2
+
+      - name: Flutter pub get
+        run: |
+          flutter config --enable-linux-desktop
+          flutter pub get
+
+      - name: Build Linux release bundle
+        run: flutter build linux --release
+
+      - name: Install fpm
+        run: sudo gem install --no-document fpm
+
+      - name: Derive version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: echo "PKG_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build .deb and .rpm
+        run: bash linux/packaging/package.sh
+
+      - name: Upload packages as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gravity-music-linux-packages
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Attach packages to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

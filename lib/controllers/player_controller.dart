@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:hive/hive.dart';
 import '../services/autoplay_orchestrator.dart';
 import '../services/library_service.dart';
+import '../services/listening_history_service.dart';
 import '../services/recommendation_service.dart';
 import '../services/thumb_util.dart';
 
@@ -57,6 +58,9 @@ class PlayerController extends GetxController {
       if (item != null) {
         isCurrentSongLiked.value = LibraryService.isLiked(item.id);
         _saveSession();
+        // Feed the listening-history store that powers the local "Made For
+        // You" mixes (play counts + first/last played).
+        ListeningHistoryService.record(item);
       }
     });
 

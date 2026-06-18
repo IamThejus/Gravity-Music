@@ -9,11 +9,9 @@
 // and removes its placeholder. Failures stay on-screen as a retry/dismiss
 // tile so nothing is silently lost.
 //
-// There is no granular progress from the backend (importPlaylist is a single
-// request), so progress is simulated 0 → 95% across the estimated time and
-// snapped to 100% on completion — same approach the old screen used.
-
-import 'dart:async';
+// Progress is REAL now: the local import matches tracks to YouTube Music one
+// by one, so importPlaylist reports (done, total) and the job's progress ring
+// reflects actual matching progress, snapping to 100% on save.
 
 import 'package:get/get.dart';
 
@@ -51,8 +49,6 @@ class ImportController extends GetxController {
   /// frequent per-job progress updates ride on [ImportJob.progress].
   final jobs = <ImportJob>[].obs;
 
-  final _tickers = <String, Timer>{};
-
   /// Begin a background import and return immediately. The caller can pop back
   /// to the Library; the placeholder tile takes over from here.
   void startImport({
@@ -80,26 +76,15 @@ class ImportController extends GetxController {
 
   /// Remove a job's placeholder tile (used to dismiss a failed import).
   void dismiss(ImportJob job) {
-    _tickers.remove(job.id)?.cancel();
     jobs.remove(job);
   }
 
   void _run(ImportJob job) {
     job.failed.value = false;
     job.error.value = '';
-    job.progress.value = 0;
-
-    final start = DateTime.now();
-    final estSec = job.estimatedSeconds.clamp(1, 600);
-    const holdCap = 0.95; // hold here until the real import completes
-
-    _tickers.remove(job.id)?.cancel();
-    _tickers[job.id] = Timer.periodic(const Duration(milliseconds: 80), (_) {
-      if (job.failed.value) return;
-      final elapsed = DateTime.now().difference(start).inMilliseconds / 1000.0;
-      job.progress.value = (elapsed / estSec).clamp(0.0, holdCap);
-    });
-
+    // Small non-zero value so the ring shows immediate activity while the
+    // playlist is being scraped (before per-track matching progress starts).
+    job.progress.value = 0.02;
     _doImport(job);
   }
 
@@ -108,6 +93,11 @@ class ImportController extends GetxController {
       final songs = await ImportService.importPlaylist(
         job.url,
         estimatedSeconds: job.estimatedSeconds,
+        onProgress: (done, total) {
+          if (job.failed.value || total == 0) return;
+          // Real matching progress; reserve the last sliver for the save step.
+          job.progress.value = (done / total * 0.97).clamp(0.02, 0.97);
+        },
       );
       if (songs.isEmpty) {
         throw const ImportException(
@@ -120,7 +110,6 @@ class ImportController extends GetxController {
           songs.map((SearchResult s) => s.toLibraryTrack()).toList();
       LibraryService.createPlaylistWithTracks(job.name, tracks);
 
-      _tickers.remove(job.id)?.cancel();
       job.progress.value = 1.0;
       // The real playlist now lives in LibraryBox; the Library grid renders it
       // via the box listener. Drop the placeholder.
@@ -140,17 +129,7 @@ class ImportController extends GetxController {
   }
 
   void _fail(ImportJob job, String msg) {
-    _tickers.remove(job.id)?.cancel();
     job.failed.value = true;
     job.error.value = msg;
-  }
-
-  @override
-  void onClose() {
-    for (final t in _tickers.values) {
-      t.cancel();
-    }
-    _tickers.clear();
-    super.onClose();
   }
 }

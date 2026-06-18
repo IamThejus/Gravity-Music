@@ -42,7 +42,7 @@ class _Bar extends StatelessWidget {
     final art = sizedThumb(song.artUri?.toString(), ThumbnailSize.micro);
 
     return Obx(() => Container(
-          height: 72,
+          height: 84,
           decoration: BoxDecoration(
             color: Color.alphaBlend(
                 colors.accent.value.withOpacity(0.12), AppColors.glassFill),
@@ -97,16 +97,30 @@ class _Bar extends StatelessWidget {
                 flex: 4,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
+                    // Compact transport row: zero-padding/compact IconButtons so
+                    // three default 48px buttons + the seek slider fit the bar
+                    // height without overflowing.
+                    SizedBox(
+                      height: 40,
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           IconButton(
-                              onPressed: pc.prev,
-                              icon: const Icon(
-                                  Icons.skip_previous_rounded)),
+                            onPressed: pc.prev,
+                            iconSize: 24,
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.skip_previous_rounded),
+                          ),
+                          const SizedBox(width: 16),
                           Obx(() => IconButton(
-                                iconSize: 34,
+                                iconSize: 32,
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
                                 onPressed: () =>
                                     pc.buttonState.value ==
                                             PlayButtonState.playing
@@ -116,35 +130,44 @@ class _Bar extends StatelessWidget {
                                     pc.buttonState.value ==
                                             PlayButtonState.playing
                                         ? Icons.pause_circle_filled_rounded
-                                        : Icons
-                                            .play_circle_fill_rounded),
+                                        : Icons.play_circle_fill_rounded),
                               )),
+                          const SizedBox(width: 16),
                           IconButton(
-                              onPressed: pc.next,
-                              icon:
-                                  const Icon(Icons.skip_next_rounded)),
-                        ]),
+                            onPressed: pc.next,
+                            iconSize: 24,
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.skip_next_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
                     Obx(() {
                       final bar = pc.progressBarState.value;
-                      final total =
-                          bar.total.inMilliseconds.toDouble();
+                      final total = bar.total.inMilliseconds.toDouble();
                       final cur = bar.current.inMilliseconds
                           .clamp(0, total <= 0 ? 1 : total.toInt())
                           .toDouble();
-                      return SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 3,
-                          thumbShape: const RoundSliderThumbShape(
-                              enabledThumbRadius: 6),
-                        ),
-                        child: Slider(
-                          value: total <= 0 ? 0 : cur,
-                          max: total <= 0 ? 1 : total,
-                          activeColor: colors.accent.value,
-                          onChanged: total <= 0
-                              ? null
-                              : (v) => pc.seek(
-                                  Duration(milliseconds: v.round())),
+                      return SizedBox(
+                        height: 28,
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3,
+                            overlayShape: SliderComponentShape.noOverlay,
+                            thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 6),
+                          ),
+                          child: Slider(
+                            value: total <= 0 ? 0 : cur,
+                            max: total <= 0 ? 1 : total,
+                            activeColor: colors.accent.value,
+                            onChanged: total <= 0
+                                ? null
+                                : (v) => pc.seek(
+                                    Duration(milliseconds: v.round())),
+                          ),
                         ),
                       );
                     }),

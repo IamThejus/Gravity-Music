@@ -42,6 +42,26 @@ static void my_application_activate(GApplication* application) {
     gtk_widget_show(GTK_WIDGET(header_bar));
     gtk_header_bar_set_title(header_bar, "Gravity Music");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
+
+    // Paint the title bar with the app's canvas colour (AppColors.canvas,
+    // #0B0B0F) and drop GTK's default border/shadow so it blends seamlessly
+    // into the in-app sidebar/content instead of reading as a separate bar.
+    GtkCssProvider* css = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(
+        css,
+        "headerbar {"
+        "  background: #0B0B0F;"
+        "  background-image: none;"
+        "  box-shadow: none;"
+        "  border: none;"
+        "  color: #ffffff;"
+        "}",
+        -1, nullptr);
+    gtk_style_context_add_provider(
+        gtk_widget_get_style_context(GTK_WIDGET(header_bar)),
+        GTK_STYLE_PROVIDER(css), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_unref(css);
+
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
     gtk_window_set_title(window, "Gravity Music");

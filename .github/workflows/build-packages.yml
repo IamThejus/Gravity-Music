@@ -1,0 +1,141 @@
+name: Build Packages
+
+# Builds the Linux desktop packages (.deb/.rpm) and the Android APK.
+# - On every push/PR touching the app: builds and uploads each as artifacts.
+# - On a version tag (v*): also attaches all of them to a GitHub Release.
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+    paths:
+      - 'lib/**'
+      - 'linux/**'
+      - 'android/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - 'assets/app_icon.png'
+      - '.github/workflows/build-packages.yml'
+  pull_request:
+    paths:
+      - 'lib/**'
+      - 'linux/**'
+      - 'android/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/build-packages.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write   # required to create the GitHub Release on v* tags
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev \
+            imagemagick rpm
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.2
+
+      - name: Flutter pub get
+        run: |
+          flutter config --enable-linux-desktop
+          flutter pub get
+
+      - name: Build Linux release bundle
+        run: flutter build linux --release
+
+      - name: Install fpm
+        run: sudo gem install --no-document fpm
+
+      - name: Derive version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: echo "PKG_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build .deb and .rpm
+        run: bash linux/packaging/package.sh
+
+      - name: Upload packages as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gravity-music-linux-packages
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Attach packages to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  android:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write   # required to attach the APK to the Release on v* tags
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.2
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build release APK
+        # Release build signs with the debug key (android/app/build.gradle.kts),
+        # so it installs via sideload. It is NOT Play-Store-signed.
+        run: flutter build apk --release
+
+      - name: Name the APK with the version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(grep -E '^version:' pubspec.yaml | head -1 | sed -E 's/version:[[:space:]]*//; s/\+.*//')"
+          fi
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/gravity-music-${VERSION}.apk"
+          ls -la dist
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gravity-music-android-apk
+          path: dist/*.apk
+          if-no-files-found: error
+
+      - name: Attach APK to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

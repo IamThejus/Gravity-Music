@@ -1,7 +1,7 @@
 name: saragama
 description: A modern, minimal YouTube audio player.
 publish_to: 'none'
-version: 1.1.0+2
+version: 1.2.2+3
 
 environment:
   sdk: ">=3.1.5 <4.0.0"
@@ -16,6 +16,13 @@ dependencies:
   # Audio playback
   just_audio: ^0.9.46
   audio_service: ^0.18.17
+
+  # Desktop (Linux/Windows) audio backend for just_audio + MPRIS for
+  # audio_service. These are platform-implementation plugins; they do not
+  # affect the Android/iOS plugin set.
+  just_audio_media_kit: ^2.0.6
+  media_kit_libs_linux: ^1.1.3
+  audio_service_mpris: ^1.0.0-beta.1
 
   # YouTube stream extraction (same forked version as HarmonyMusic)
   youtube_explode_dart:

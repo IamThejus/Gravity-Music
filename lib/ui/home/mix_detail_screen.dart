@@ -33,7 +33,11 @@ class MixDetailScreen extends StatelessWidget {
             SliverAppBar(
               backgroundColor: AppColors.canvas,
               pinned: true,
-              expandedHeight: 280,
+              // 320 (not 280): the header Column — 80px top pad + 150 art +
+              // 12 gap + title + subtitle + 12 bottom pad — needs ~307px and
+              // overflowed by 27px at 280, clipping the title under the
+              // RenderFlex warning stripes.
+              expandedHeight: 320,
               leading: const AppBackButton(),
               flexibleSpace: FlexibleSpaceBar(
                 background: Padding(

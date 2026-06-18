@@ -246,6 +246,100 @@ class YtMusicService {
     return '';
   }
 
+  /// Returns plain (unsynced) lyrics for [videoId] from YouTube Music
+  /// (source: Musixmatch), or '' if none. Two calls: `next` to find the song's
+  /// Lyrics-tab browseId, then `browse` to fetch the text. Used as a fallback
+  /// when lrclib has no (synced) lyrics — common for regional tracks.
+  static Future<String> lyrics(String videoId) async {
+    if (videoId.isEmpty) return '';
+    try {
+      // 1. Watch panel → locate the Lyrics tab's browseId.
+      final nextRes = await http
+          .post(
+            Uri.parse('https://music.youtube.com/youtubei/v1/next'
+                '?prettyPrint=false'),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Origin': 'https://music.youtube.com',
+              'User-Agent': _ua,
+            },
+            body: jsonEncode({
+              'context': {
+                'client': {
+                  'clientName': 'WEB_REMIX',
+                  'clientVersion': _clientVersion,
+                  'hl': 'en',
+                  'gl': 'US',
+                }
+              },
+              'videoId': videoId,
+              'playlistId': 'RDAMVM$videoId',
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (nextRes.statusCode != 200) return '';
+
+      final browseId = _lyricsBrowseId(jsonDecode(nextRes.body));
+      if (browseId == null) return '';
+
+      // 2. Browse the lyrics tab → extract the text.
+      final brRes = await http
+          .post(
+            Uri.parse('https://music.youtube.com/youtubei/v1/browse'
+                '?prettyPrint=false'),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Origin': 'https://music.youtube.com',
+              'User-Agent': _ua,
+            },
+            body: jsonEncode({
+              'context': {
+                'client': {
+                  'clientName': 'WEB_REMIX',
+                  'clientVersion': _clientVersion,
+                  'hl': 'en',
+                  'gl': 'US',
+                }
+              },
+              'browseId': browseId,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (brRes.statusCode != 200) return '';
+
+      return _lyricsText(jsonDecode(brRes.body));
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static String? _lyricsBrowseId(dynamic data) {
+    final tabs = <dynamic>[];
+    _collect(data, 'tabRenderer', tabs);
+    for (final t in tabs) {
+      if (t is! Map) continue;
+      final bid = t['endpoint']?['browseEndpoint']?['browseId'];
+      if (bid is String && bid.startsWith('MPLY')) return bid;
+    }
+    return null;
+  }
+
+  static String _lyricsText(dynamic data) {
+    final shelves = <dynamic>[];
+    _collect(data, 'musicDescriptionShelfRenderer', shelves);
+    for (final s in shelves) {
+      if (s is! Map) continue;
+      final runs = s['description']?['runs'];
+      if (runs is List && runs.isNotEmpty) {
+        final text = runs
+            .map((r) => r is Map ? (r['text'] ?? '').toString() : '')
+            .join();
+        if (text.trim().isNotEmpty) return text.trim();
+      }
+    }
+    return '';
+  }
+
   /// Scrapes the current WEB_REMIX client version from the music.youtube.com
   /// page config and caches it. Returns true if a *different* version was found
   /// (so the caller retries). Called only after a failed request — lets a

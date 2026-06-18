@@ -1,8 +1,16 @@
 // services/recommendation_service.dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-
+//
+// "Up next" / autoplay recommendations resolved ON-DEVICE via the YouTube Music
+// radio queue (YtMusicService.radio → the `next` endpoint), replacing the
+// SaraGama /recommendation endpoint — which itself just proxied this exact
+// call, so the results match (verified against SaraGama: same song pool, clean
+// titles, real artists, square googleusercontent art).
+//
+// Public surface is unchanged: `getRecommendations(videoId)` still returns a
+// RecommendedTrack list, so PlayerController.playWithRecommendations and the
+// AutoplayOrchestrator are untouched.
 import 'thumb_util.dart';
+import 'yt_music_service.dart';
 
 class RecommendedTrack {
   final String videoId;
@@ -28,23 +36,21 @@ class RecommendedTrack {
     return Duration.zero;
   }
 
-  factory RecommendedTrack.fromJson(Map<String, dynamic> json) {
-    final rawThumb = json['thumbnail'] ?? '';
-    return RecommendedTrack(
-      videoId: json['video_id'] ?? '',
-      title: json['title'] ?? '',
-      artist: json['artist'] ?? '',
-      // Always store a high-quality thumbnail for recommendations so
-      // now playing + notification art look sharp.
-      thumbnail: ThumbUtil.get(rawThumb, ThumbnailSize.tile),
-      duration: json['duration'] ?? '',
-    );
-  }
+  /// Builds a RecommendedTrack from an on-device YouTube Music radio song.
+  /// Square googleusercontent art → ThumbUtil resizes it, so now-playing /
+  /// notification art stays sharp.
+  factory RecommendedTrack.fromYtMusic(YtMusicSong s) => RecommendedTrack(
+        videoId: s.videoId,
+        title: s.title,
+        artist: s.artists.join(', '),
+        thumbnail: ThumbUtil.get(s.thumbnail, ThumbnailSize.tile),
+        duration: s.duration,
+      );
 }
 
 class RecommendationService {
-  static const _base       = 'https://saragama-render.onrender.com';
   static const _ttlMinutes = 60; // recommendations don't change within an hour
+  static const _maxResults = 25; // cap the related list we keep per seed
 
   // In-memory cache: videoId → (tracks, timestamp)
   // Recommendations are per-video so a simple map is sufficient — no LRU
@@ -64,22 +70,20 @@ class RecommendationService {
       _cache.remove(videoId); // stale, remove
     }
 
-    // 2. Fetch from API
+    // 2. Resolve on-device: the YouTube Music radio queue for this seed.
     try {
-      final uri = Uri.parse('$_base/recommendation')
-          .replace(queryParameters: {'video_id': videoId});
-      final res = await http.get(uri).timeout(const Duration(seconds: 10));
-      if (res.statusCode == 200) {
-        final List data = json.decode(res.body);
-        final tracks = data
-            .map((e) => RecommendedTrack.fromJson(Map<String, dynamic>.from(e)))
-            .where((t) => t.videoId.isNotEmpty)
-            .toList();
-        _cache[videoId] = (tracks: tracks, ts: DateTime.now());
-        return tracks;
-      }
-    } catch (_) {}
-    return [];
+      final songs = await YtMusicService.radio(videoId);
+      final tracks = songs
+          .take(_maxResults)
+          .map(RecommendedTrack.fromYtMusic)
+          .where((t) => t.videoId.isNotEmpty)
+          .toList();
+
+      _cache[videoId] = (tracks: tracks, ts: DateTime.now());
+      return tracks;
+    } catch (_) {
+      return [];
+    }
   }
 
   static void clearCache() => _cache.clear();

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
+import '../services/yt_music_service.dart';
+
 class LyricLine {
   final Duration timestamp;
   final String text;
@@ -35,14 +37,9 @@ class LyricsController extends GetxController {
   Timer?   _throttleTimer;
   Duration _lastPosition = Duration.zero;
 
-  final ScrollController scrollController = ScrollController();
-  static const double lineHeight = 68.0;
-
-
   @override
   void onClose() {
     _throttleTimer?.cancel();
-    scrollController.dispose();
     super.onClose();
   }
 
@@ -109,7 +106,19 @@ class LyricsController extends GetxController {
         }
       }
 
-      // Nothing matched on any strategy — cache the miss so we don't refetch.
+      // lrclib had nothing — fall back to YouTube Music (plain, unsynced;
+      // source: Musixmatch). Covers regional tracks lrclib lacks.
+      final ytmPlain = await YtMusicService.lyrics(trackId);
+      if (trackId != _currentTrackId) return; // user moved on
+      if (ytmPlain.isNotEmpty) {
+        final fallback =
+            _CachedLyrics(hasSynced: false, lines: const [], plain: ytmPlain);
+        _lyricsCache[trackId] = fallback;
+        _applyCache(fallback);
+        return;
+      }
+
+      // Nothing anywhere — cache the miss so we don't refetch.
       const empty = _CachedLyrics(hasSynced: false, lines: [], plain: '');
       _lyricsCache[trackId] = empty;
       _applyCache(empty);
@@ -252,16 +261,9 @@ class LyricsController extends GetxController {
       if (lines[mid].timestamp <= pos) { result = mid; lo = mid + 1; }
       else { hi = mid - 1; }
     }
-    if (result == activeIndex.value) return;
-    activeIndex.value = result;
-    if (result >= 0 && scrollController.hasClients) {
-      final viewport = scrollController.position.viewportDimension;
-      final target = (result * lineHeight) - (viewport / 2) + (lineHeight / 2);
-      scrollController.animateTo(
-        target.clamp(0.0, scrollController.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeOutCubic,
-      );
-    }
+    // Only publish the active line. The lyrics view owns the (variable-height)
+    // auto-centering via ScrollablePositionedList, keyed off this index — the
+    // old fixed-height scroll math here drifted the active line off-centre.
+    if (result != activeIndex.value) activeIndex.value = result;
   }
 }

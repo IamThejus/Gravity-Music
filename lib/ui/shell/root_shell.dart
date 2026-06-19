@@ -20,7 +20,9 @@ import '../queue/queue_screen.dart';
 import '../search/search_screen.dart';
 import '../theme/motion.dart';
 import '../widgets/mini_player.dart';
+import 'desktop_shell.dart';
 import 'floating_nav_bar.dart';
+import 'responsive.dart';
 
 class RootShell extends StatefulWidget {
   const RootShell({super.key});
@@ -70,50 +72,54 @@ class _RootShellState extends State<RootShell>
     super.dispose();
   }
 
+  Widget _content() => FadeTransition(
+        opacity: _fade,
+        child: IndexedStack(
+          index: _index,
+          sizing: StackFit.expand,
+          children: _screens,
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.canvas,
-      extendBody: true,
-      body: Stack(
-        children: [
-          // Only the selected IndexedStack child paints; the others stay
-          // mounted (scroll/controllers intact) but are not rastered. The
-          // fade+scale runs on this single subtree during a switch, so at most
-          // ONE screen is ever composited at partial opacity.
-          Positioned.fill(
-            child: FadeTransition(
-              opacity: _fade,
-              child: IndexedStack(
-                index: _index,
-                sizing: StackFit.expand,
-                children: _screens,
-              ),
-            ),
-          ),
-          // Floating dock: mini-player stacked over the nav, both suspended
-          // off the bottom edge.
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const MiniPlayer(),
-                    const SizedBox(height: 10),
-                    FloatingNavBar(currentIndex: _index, onTap: _onTap),
-                  ],
+    return LayoutBuilder(builder: (context, constraints) {
+      if (isDesktopWidth(constraints.maxWidth)) {
+        return DesktopShell(
+          content: _content(),
+          currentIndex: _index,
+          onTap: _onTap,
+        );
+      }
+      // ── Mobile shell (unchanged) ──
+      return Scaffold(
+        backgroundColor: AppColors.canvas,
+        extendBody: true,
+        body: Stack(
+          children: [
+            Positioned.fill(child: _content()),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const MiniPlayer(),
+                      const SizedBox(height: 10),
+                      FloatingNavBar(currentIndex: _index, onTap: _onTap),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    });
   }
 }

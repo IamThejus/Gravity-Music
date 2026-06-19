@@ -15,6 +15,7 @@ import '../../services/search_service.dart';
 import '../../services/thumb_util.dart';
 import '../app_theme.dart';
 import '../theme/glass.dart';
+import '../shell/responsive.dart';
 import '../ui_helpers.dart';
 import '../widgets/common_widgets.dart';
 
@@ -167,7 +168,7 @@ class SearchScreen extends StatelessWidget {
                   );
                 }
                 return ListView.builder(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.bottomDock),
+                  padding: EdgeInsets.only(bottom: bottomDockInset(context)),
                   itemCount: sc.results.length,
                   itemBuilder: (_, i) {
                     final r = sc.results[i];
@@ -200,7 +201,7 @@ class _IdleView extends StatelessWidget {
   Widget build(BuildContext context) {
     final pc = Get.find<PlayerController>();
     return ListView(
-      padding: const EdgeInsets.only(bottom: AppSpacing.bottomDock),
+      padding: EdgeInsets.only(bottom: bottomDockInset(context)),
       children: [
         Obx(() {
           final recent = pc.searchHistory;
@@ -247,32 +248,34 @@ class _IdleView extends StatelessWidget {
         Padding(
           padding:
               const EdgeInsets.symmetric(horizontal: AppSpacing.screenMargin),
-          child: GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: AppSpacing.gutter,
-            mainAxisSpacing: AppSpacing.gutter,
-            childAspectRatio: 1.7,
-            children: _genres.map((g) {
-              return GestureDetector(
-                onTap: () => sc.runQuery(g.$1),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [g.$2, g.$2.withOpacity(0.4)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+          child: LayoutBuilder(builder: (context, c) {
+            return GridView.count(
+              crossAxisCount: gridColumns(c.maxWidth),
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: AppSpacing.gutter,
+              mainAxisSpacing: AppSpacing.gutter,
+              childAspectRatio: 1.7,
+              children: _genres.map((g) {
+                return GestureDetector(
+                  onTap: () => sc.runQuery(g.$1),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [g.$2, g.$2.withOpacity(0.4)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    alignment: Alignment.bottomLeft,
+                    child: Text(g.$1, style: AppText.heading(size: 18)),
                   ),
-                  alignment: Alignment.bottomLeft,
-                  child: Text(g.$1, style: AppText.heading(size: 18)),
-                ),
-              );
-            }).toList(),
-          ),
+                );
+              }).toList(),
+            );
+          }),
         ),
       ],
     );

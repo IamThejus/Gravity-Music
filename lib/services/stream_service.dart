@@ -5,6 +5,8 @@
 import 'dart:io';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
+import '../util/log.dart';
+
 class StreamProvider {
   final bool playable;
   final List<Audio>? audioFormats;
@@ -19,9 +21,12 @@ class StreamProvider {
  static Future<StreamProvider> fetch(String videoId) async {
     final yt = YoutubeExplode();
     
+    logD('stream', 'fetch($videoId): requesting manifest…');
     try {
       final res = await yt.videos.streamsClient.getManifest(videoId);
       final audio = res.audioOnly;
+      logD('stream', 'fetch($videoId): OK — ${audio.length} audio formats '
+          '(itags: ${audio.map((e) => e.tag).toList()})');
       return StreamProvider(
           playable: true,
           statusMSG: "OK",
@@ -36,8 +41,10 @@ class StreamProvider {
                   url: e.url.toString(),
                   size: e.size.totalBytes))
               .toList());
-  
-    } catch (e) {
+
+    } catch (e, st) {
+      logD('stream', 'fetch($videoId): FAILED — ${e.runtimeType}: $e');
+      logD('stream', st.toString());
       if (e is SocketException) {
         return StreamProvider(playable: false, statusMSG: 'Network error');
       } else if (e is VideoUnplayableException) {

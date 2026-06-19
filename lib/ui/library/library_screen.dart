@@ -16,6 +16,7 @@ import '../../services/library_service.dart';
 import '../../services/thumb_util.dart';
 import '../app_theme.dart';
 import '../theme/glass.dart';
+import '../shell/responsive.dart';
 import '../ui_helpers.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/mini_player.dart';
@@ -138,55 +139,57 @@ class _LibraryScreenState extends State<LibraryScreen> {
           SliverPadding(
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.screenMargin),
-            sliver: SliverGrid(
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: AppSpacing.gutter,
-                mainAxisSpacing: AppSpacing.gutter,
-                childAspectRatio: 0.78,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (_, i) {
-                  // In-progress imports render first as placeholder tiles, then
-                  // the real playlists.
-                  if (i < jobs.length) {
-                    return _ImportingTile(job: jobs[i]);
-                  }
-                  final pl = playlists[i - jobs.length];
-                  return Stack(
-                    children: [
-                      ArtCard(
-                        imageUrl:
-                            sizedThumb(pl.thumbnailUrl, ThumbnailSize.card),
-                        title: pl.name,
-                        subtitle: '${pl.tracks.length} songs',
-                        size: double.infinity,
-                        onTap: () async {
-                          await Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) =>
-                                  PlaylistDetailScreen(playlistId: pl.id)));
-                          _refresh();
-                        },
-                      ),
-                      // Small offline-download indicator over the cover's
-                      // top-right corner (purely informational).
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: IgnorePointer(
-                          child: _PlaylistDownloadBadge(playlistId: pl.id),
+            sliver: Builder(builder: (context) {
+              final cols = gridColumns(MediaQuery.sizeOf(context).width);
+              return SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: cols,
+                  crossAxisSpacing: AppSpacing.gutter,
+                  mainAxisSpacing: AppSpacing.gutter,
+                  childAspectRatio: 0.78,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (_, i) {
+                    // In-progress imports render first as placeholder tiles, then
+                    // the real playlists.
+                    if (i < jobs.length) {
+                      return _ImportingTile(job: jobs[i]);
+                    }
+                    final pl = playlists[i - jobs.length];
+                    return Stack(
+                      children: [
+                        ArtCard(
+                          imageUrl:
+                              sizedThumb(pl.thumbnailUrl, ThumbnailSize.card),
+                          title: pl.name,
+                          subtitle: '${pl.tracks.length} songs',
+                          size: double.infinity,
+                          onTap: () async {
+                            await Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) =>
+                                    PlaylistDetailScreen(playlistId: pl.id)));
+                            _refresh();
+                          },
                         ),
-                      ),
-                    ],
-                  );
-                },
-                childCount: jobs.length + playlists.length,
-              ),
-            ),
+                        // Small offline-download indicator over the cover's
+                        // top-right corner (purely informational).
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: IgnorePointer(
+                            child: _PlaylistDownloadBadge(playlistId: pl.id),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                  childCount: jobs.length + playlists.length,
+                ),
+              );
+            }),
           ),
-        const SliverToBoxAdapter(
-            child: SizedBox(height: AppSpacing.bottomDock)),
+        SliverToBoxAdapter(
+            child: SizedBox(height: bottomDockInset(context))),
       ],
     );
   }
@@ -688,8 +691,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
               ),
             ),
           ],
-          const SliverToBoxAdapter(
-              child: SizedBox(height: AppSpacing.bottomDock)),
+          SliverToBoxAdapter(
+              child: SizedBox(height: bottomDockInset(context))),
         ],
         ),
       ),

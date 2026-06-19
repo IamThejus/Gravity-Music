@@ -17,6 +17,7 @@ import '../../services/mixes_service.dart';
 import '../../services/thumb_util.dart';
 import '../app_theme.dart';
 import '../library/library_screen.dart';
+import '../shell/responsive.dart';
 import '../theme/glass.dart';
 import '../ui_helpers.dart';
 import '../widgets/common_widgets.dart';
@@ -174,8 +175,8 @@ class HomeScreen extends StatelessWidget {
               ),
             );
           })),
-          const SliverToBoxAdapter(
-              child: SizedBox(height: AppSpacing.bottomDock)),
+          SliverToBoxAdapter(
+              child: SizedBox(height: bottomDockInset(context))),
         ],
       ),
     );

@@ -20,6 +20,8 @@ import 'dart:math';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../util/log.dart';
+
 // ── Playback state machine ──────────────────────────────────────────────────
 // Single source of truth for "what is the player doing right now?"
 // Mode flags (loop/shuffle/queueLoop/loudness) are intentionally NOT part
@@ -135,16 +137,47 @@ class PlaybackEngine {
       ),
     );
 
-    // Set the (initially empty) ConcatenatingAudioSource as the source.
-    // The handler will populate it via playList.add() during track changes.
-    try {
-      player.setAudioSource(playList);
-    } catch (_) {
-      // Setting an empty concatenating source throws on some platforms;
-      // ignore — the first add() will succeed.
+    // Mobile uses the (initially empty) ConcatenatingAudioSource, populated via
+    // playList.add() on each track change. Desktop (media_kit) does NOT reliably
+    // reload a mutated ConcatenatingAudioSource — the first track plays but
+    // subsequent clear()/add() swaps produce no audio — so on desktop each track
+    // is loaded with setAudioSource() instead (see loadCurrent/clearForReload).
+    if (!_isDesktop) {
+      try {
+        player.setAudioSource(playList);
+      } catch (_) {
+        // Setting an empty concatenating source throws on some platforms;
+        // ignore — the first add() will succeed.
+      }
     }
 
     _listenForTrackEnd();
+  }
+
+  /// True on desktop platforms, where media_kit backs just_audio.
+  static final bool _isDesktop =
+      Platform.isLinux || Platform.isWindows || Platform.isMacOS;
+
+  /// Stop the current track before loading the next. Mobile empties the
+  /// ConcatenatingAudioSource; desktop pauses (setAudioSource will replace the
+  /// source in [loadCurrent], so there is nothing to empty).
+  Future<void> clearForReload() async {
+    if (_isDesktop) {
+      await player.pause();
+    } else {
+      await playList.clear();
+    }
+  }
+
+  /// Load [source] as the current (single) track. Mobile appends to the
+  /// ConcatenatingAudioSource; desktop replaces the player's source outright,
+  /// which media_kit reloads reliably on every track change.
+  Future<void> loadCurrent(AudioSource source) async {
+    if (_isDesktop) {
+      await player.setAudioSource(source);
+    } else {
+      await playList.add(source);
+    }
   }
 
   /// Transition the phase, logging illegal moves but applying them anyway
@@ -152,6 +185,8 @@ class PlaybackEngine {
   void setPhase(PlaybackPhase next, {String? reason}) {
     if (next == _phase) return;
     final legal = _legalTransitions[_phase]?.contains(next) ?? false;
+    logD('engine', '$_phase -> $next'
+        '${reason != null ? " ($reason)" : ""}${legal ? "" : " [ILLEGAL]"}');
     if (!legal) {
       // ignore: avoid_print
       print('[phase] illegal transition: $_phase -> $next'

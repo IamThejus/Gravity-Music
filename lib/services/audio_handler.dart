@@ -33,6 +33,7 @@ import '../services/stream_service.dart';
 import '../services/thumb_util.dart';
 import '../controllers/player_controller.dart';
 import '../ui/ui_helpers.dart';
+import '../util/log.dart';
 
 Future<AudioHandler> initAudioService() async {
   return AudioService.init(
@@ -166,6 +167,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         ));
       },
       onError: (Object e, StackTrace st) async {
+        logD('handler', 'playbackEvent error — ${e.runtimeType}: $e '
+            '(index=$currentIndex) → re-fetching fresh URL');
         // On any playback error, re-fetch a fresh URL (same recovery as HarmonyMusic)
         final curPos = _engine.player.position;
         await _engine.player.stop();
@@ -384,6 +387,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
   Future<HMStreamingData> checkNGetUrl(String videoId,
       {bool generateNewUrl = false}) async {
+    logD('url', 'checkNGetUrl($videoId) start');
     final urlCacheBox = Hive.box('SongsUrlCache');
     final qualityIndex = Hive.box('AppPrefs').get('streamingQuality') ?? 1;
 
@@ -436,9 +440,21 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     }
 
     // 2. Fetch fresh from YouTube in a background Isolate (same as HarmonyMusic)
+    logD('url', 'checkNGetUrl($videoId): cache miss — fetching in isolate '
+        '(newUrl=$generateNewUrl)');
     final token = RootIsolateToken.instance!;
-    final json = await Isolate.run(() => getStreamInfo(videoId, token));
+    final Map<String, dynamic> json;
+    try {
+      json = await Isolate.run(() => getStreamInfo(videoId, token));
+    } catch (e, st) {
+      logD('url', 'checkNGetUrl($videoId): ISOLATE THREW — ${e.runtimeType}: $e');
+      logD('url', st.toString());
+      rethrow;
+    }
     final data = HMStreamingData.fromJson(json);
+    final url = data.audio?.url ?? '';
+    logD('url', 'checkNGetUrl($videoId): playable=${data.playable} '
+        'status="${data.statusMSG}" hasUrl=${url.isNotEmpty}');
 
     if (data.playable) {
       urlCacheBox.put(videoId, json);
@@ -593,7 +609,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         // just_audio keeps playing the old source while we await
         // checkNGetUrl(), causing the old song to bleed briefly.
         await _engine.player.pause();
-        await _engine.playList.clear();
+        await _engine.clearForReload();
         currentSongUrl = null;
         playbackState.add(playbackState.value.copyWith(
           processingState: AudioProcessingState.loading,
@@ -621,7 +637,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         }
 
         currentSongUrl = song.extras!['url'] = streamInfo.audio!.url;
-        await _engine.playList.add(_engine.createSource(song));
+        await _engine.loadCurrent(_engine.createSource(song));
 
         _engine.setPhase(PlaybackPhase.ready,
             reason: 'playByIndex source ready');
@@ -646,7 +662,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         _engine.setPhase(PlaybackPhase.loading,
             reason: 'setSourceNPlay start');
         currentIndex = 0;
-        await _engine.playList.clear();
+        await _engine.clearForReload();
         mediaItem.add(song);
         queue.add([song]);
 
@@ -677,7 +693,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         }
 
         currentSongUrl = song.extras!['url'] = streamInfo.audio!.url;
-        await _engine.playList.add(_engine.createSource(song));
+        await _engine.loadCurrent(_engine.createSource(song));
         _engine.setPhase(PlaybackPhase.ready,
             reason: 'setSourceNPlay source ready');
 
@@ -771,8 +787,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
         currentSongUrl = items[restoreIndex].extras!['url'] =
             restoreStream.audio!.url;
-        await _engine.playList.clear();
-        await _engine.playList.add(_engine.createSource(items[restoreIndex]));
+        await _engine.clearForReload();
+        await _engine.loadCurrent(_engine.createSource(items[restoreIndex]));
         _engine.setPhase(PlaybackPhase.ready,
             reason: 'restoreSession source ready');
         playbackState.add(playbackState.value.copyWith(
@@ -806,7 +822,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
         // Stop current playback and clear audio source list
         await _engine.player.stop();
-        await _engine.playList.clear();
+        await _engine.clearForReload();
 
         queue.add(items);
         currentIndex = startIndex;
@@ -831,7 +847,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         }
 
         currentSongUrl = currentItem.extras!['url'] = streamInfo.audio!.url;
-        await _engine.playList.add(_engine.createSource(currentItem));
+        await _engine.loadCurrent(_engine.createSource(currentItem));
 
         _engine.setPhase(PlaybackPhase.ready,
             reason: 'playAllFrom source ready');
@@ -866,7 +882,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         Get.find<PlayerController>().syncShuffleDisabled();
 
         await _engine.player.stop();
-        await _engine.playList.clear();
+        await _engine.clearForReload();
 
         queue.add(shuffleItems);
         currentIndex = 0;
@@ -891,7 +907,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         }
 
         currentSongUrl = firstItem.extras!['url'] = shuffleStream.audio!.url;
-        await _engine.playList.add(_engine.createSource(firstItem));
+        await _engine.loadCurrent(_engine.createSource(firstItem));
 
         _engine.setPhase(PlaybackPhase.ready,
             reason: 'playShuffled source ready');

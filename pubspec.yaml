@@ -45,6 +45,13 @@ dependencies:
   share_plus: ^10.1.4         # native share sheet
   scrollable_positioned_list: ^0.3.8  # index-based auto-centering for synced lyrics
 
+# Local patched copy of just_audio_media_kit: disables libmpv `cache-on-disk`
+# (media_kit hardcodes it on), which on some Linux setups fails to create the
+# on-disk cache and breaks start-of-track seek → no audio. See vendor/.
+dependency_overrides:
+  just_audio_media_kit:
+    path: vendor/just_audio_media_kit
+
 dev_dependencies:
   flutter_lints: ^4.0.0
   flutter_test:

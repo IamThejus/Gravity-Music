@@ -1,7 +1,16 @@
 // services/search_service.dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+//
+// Search is resolved ON-DEVICE via the YouTube MUSIC catalog (YtMusicService) —
+// no SaraGama API, no ytmusicapi, no Render endpoint. This removes the
+// shared-server-IP variance (results reflect the user's own device/region,
+// consistently) AND restores clean results: real song titles, real artist
+// names, and square googleusercontent album art — same quality SaraGama gave,
+// vs. youtube_explode's regular-YouTube video clutter.
+//
+// The public surface is unchanged: callers still get a SearchResult list from
+// `autocomplete(query)`, so the search screen / import flow are untouched.
 import 'thumb_util.dart';
+import 'yt_music_service.dart';
 
 class SearchResult {
   final String title;
@@ -29,10 +38,23 @@ class SearchResult {
     return Duration.zero;
   }
 
-  /// Sizes thumbnail for list-tile display (96px — 6× smaller than 544px).
+  /// Sizes a thumbnail for list-tile display (96px). YT Music album art is a
+  /// square `googleusercontent` URL, which ThumbUtil resizes via its
+  /// `=wW-hH-…` rewrite — so now-playing/notification art stays sharp too.
   static String _upgradeThumb(String url) =>
       ThumbUtil.get(url, ThumbnailSize.tile);
 
+  /// Builds a SearchResult from an on-device YouTube Music song.
+  factory SearchResult.fromYtMusic(YtMusicSong s) => SearchResult(
+        title: s.title,
+        videoId: s.videoId,
+        artists: s.artists,
+        thumbnail: _upgradeThumb(s.thumbnail),
+        duration: s.duration,
+      );
+
+  /// Still used by the playlist-import flow (ImportService), which parses
+  /// JSON track payloads. Search itself no longer goes through JSON.
   factory SearchResult.fromJson(Map<String, dynamic> json) => SearchResult(
         title: json['title'] ?? '',
         videoId: json['video_url'] ?? '',
@@ -43,12 +65,12 @@ class SearchResult {
 }
 
 class SearchService {
-  static const _base        = 'https://saragama-render.onrender.com';
+  static const _maxResults   = 20;         // results returned per query
   static const _maxCacheSize = 30;         // max distinct queries kept
   static const _ttlMinutes   = 15;         // cache entries expire after 15 min
 
   // LRU cache: query → (results, timestamp)
-  // Using a LinkedHashMap to maintain insertion order for LRU eviction.
+  // Using insertion-order iteration for LRU eviction.
   static final _cache =
       <String, ({List<SearchResult> results, DateTime ts})>{};
 
@@ -70,26 +92,24 @@ class SearchService {
       }
     }
 
-    // 2. Cache miss — fetch from API
+    // 2. Cache miss — resolve on-device via the YouTube Music catalog.
     try {
-      final uri = Uri.parse('$_base/autocomplete')
-          .replace(queryParameters: {'q': query.trim()});
-      final res = await http.get(uri).timeout(const Duration(seconds: 8));
-      if (res.statusCode == 200) {
-        final List data = json.decode(res.body);
-        final results = data
-            .map((e) => SearchResult.fromJson(Map<String, dynamic>.from(e)))
-            .toList();
+      final songs = await YtMusicService.searchSongs(query.trim());
+      final results = songs
+          .take(_maxResults)
+          .map(SearchResult.fromYtMusic)
+          .where((r) => r.videoId.isNotEmpty)
+          .toList();
 
-        // 3. Store in cache, evict oldest if over limit
-        if (_cache.length >= _maxCacheSize) {
-          _cache.remove(_cache.keys.first); // remove LRU (first = oldest)
-        }
-        _cache[key] = (results: results, ts: DateTime.now());
-        return results;
+      // 3. Store in cache, evict oldest if over limit
+      if (_cache.length >= _maxCacheSize) {
+        _cache.remove(_cache.keys.first); // remove LRU (first = oldest)
       }
-    } catch (_) {}
-    return [];
+      _cache[key] = (results: results, ts: DateTime.now());
+      return results;
+    } catch (_) {
+      return [];
+    }
   }
 
   /// Clear all cached search results (e.g. on low memory).

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Gravity Music - Library</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface": "#e5e2e1",
+                        "on-error": "#690005",
+                        "tertiary-fixed": "#e5e2e1",
+                        "surface-container-lowest": "#0e0e0e",
+                        "primary": "#ffffff",
+                        "inverse-on-surface": "#313030",
+                        "on-surface-variant": "#c4c7c8",
+                        "on-tertiary": "#313030",
+                        "surface-variant": "#353434",
+                        "on-background": "#e5e2e1",
+                        "on-secondary-container": "#bab8b7",
+                        "surface-tint": "#c6c6c7",
+                        "primary-fixed": "#e2e2e2",
+                        "on-primary": "#2f3131",
+                        "on-tertiary-container": "#656464",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "tertiary-container": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "outline-variant": "#444748",
+                        "on-secondary-fixed-variant": "#474646",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-container-highest": "#353434",
+                        "inverse-primary": "#5d5f5f",
+                        "secondary": "#c9c6c5",
+                        "tertiary": "#ffffff",
+                        "surface-dim": "#141313",
+                        "surface-container-high": "#2a2a2a",
+                        "primary-fixed-dim": "#c6c6c7",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-primary-container": "#636565",
+                        "outline": "#8e9192",
+                        "on-primary-fixed": "#1a1c1c",
+                        "surface-bright": "#3a3939",
+                        "tertiary-fixed-dim": "#c8c6c5",
+                        "on-secondary": "#313030",
+                        "error": "#ffb4ab",
+                        "surface": "#141313",
+                        "secondary-fixed-dim": "#c9c6c5",
+                        "on-tertiary-fixed-variant": "#474746",
+                        "on-primary-fixed-variant": "#454747",
+                        "secondary-container": "#4a4949",
+                        "primary-container": "#e2e2e2",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-low": "#1c1b1b",
+                        "background": "#141313",
+                        "surface-container": "#201f1f",
+                        "on-tertiary-fixed": "#1c1b1b"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "screen-margin": "1.25rem",
+                        "stack-lg": "2.5rem",
+                        "gutter": "1rem",
+                        "stack-sm": "0.5rem",
+                        "stack-md": "1.5rem"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "display-hero": ["Inter"],
+                        "title-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["28px", { "lineHeight": "34px", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "display-hero": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "title-md": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+            /* Radial gradient for cinematic depth */
+            background-image: radial-gradient(circle at top right, rgba(255,255,255,0.03) 0%, transparent 50%),
+                              radial-gradient(circle at bottom left, rgba(255,255,255,0.02) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+        
+        /* Glassmorphism utilities */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .glass-button {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            transition: all 0.2s ease;
+        }
+        
+        .glass-button:active {
+            background: rgba(255, 255, 255, 0.16);
+            transform: scale(0.98);
+        }
+        
+        .list-item-hover:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+        
+        /* Hide scrollbar for clean aesthetic */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+        * {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .safe-area-pb {
+            padding-bottom: calc(5rem + 16px + 4.5rem + 2rem); /* Bottom nav + miniplayer + margins */
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="antialiased min-h-screen relative flex flex-col items-center">
+<!-- Top App Bar - Suspended Containment -->
+<header class="fixed top-0 left-0 right-0 z-40 px-screen-margin pt-screen-margin pb-4 bg-gradient-to-b from-background to-transparent pointer-events-none">
+<div class="flex justify-between items-center w-full max-w-2xl mx-auto pointer-events-auto">
+<!-- Leading Avatar -->
+<button class="w-10 h-10 rounded-full overflow-hidden border border-white/10 hover:opacity-80 transition-opacity">
+<img alt="User Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCC2LMG14n90bb7RxbA5dTBhQSXo1AgMnp7SLd9nLwoPtH9ejoxwIAD8AMvwh5HuKFxlVAZw8yMp9_x_GT56zspehEh5OpqJfEwTw3UBUd2RCGGEIEbeazi-KNCJ0YPfZzCX9VP4jC8-lgypxezHSBaJfCZ-I-oIsVOnEhy7wUo2yT_3FM2ohKf1jc-Q3Xq1jRasFfX8pR1upTys6Q8f-lB38sD-JCdlYVvo3xJOSHp4DPYZp7iEcrIRUO2Flq3gq4wj8zawnqaP0o"/>
+</button>
+<!-- Headline -->
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary tracking-tight">Library</h1>
+<!-- Trailing Icon -->
+<button class="w-10 h-10 flex items-center justify-center rounded-full glass-button text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">search</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="w-full max-w-2xl mx-auto px-screen-margin pt-28 safe-area-pb flex flex-col gap-stack-lg">
+<!-- Library Navigation List - Glassmorphism -->
+<section class="glass-panel rounded-xl overflow-hidden shadow-2xl flex flex-col">
+<!-- Liked Songs -->
+<button class="flex items-center justify-between p-4 list-item-hover transition-colors border-b border-white/5 w-full text-left">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</div>
+<span class="font-title-md text-title-md text-primary">Liked Songs</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/50">chevron_right</span>
+</button>
+<!-- Playlists -->
+<button class="flex items-center justify-between p-4 list-item-hover transition-colors border-b border-white/5 w-full text-left">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">queue_music</span>
+</div>
+<span class="font-title-md text-title-md text-primary">Playlists</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/50">chevron_right</span>
+</button>
+<!-- Albums -->
+<button class="flex items-center justify-between p-4 list-item-hover transition-colors border-b border-white/5 w-full text-left">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">album</span>
+</div>
+<span class="font-title-md text-title-md text-primary">Albums</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/50">chevron_right</span>
+</button>
+<!-- Artists -->
+<button class="flex items-center justify-between p-4 list-item-hover transition-colors border-b border-white/5 w-full text-left">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">mic_external_on</span>
+</div>
+<span class="font-title-md text-title-md text-primary">Artists</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/50">chevron_right</span>
+</button>
+<!-- Downloads -->
+<button class="flex items-center justify-between p-4 list-item-hover transition-colors w-full text-left">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">download_for_offline</span>
+</div>
+<span class="font-title-md text-title-md text-primary">Downloads</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant/50">chevron_right</span>
+</button>
+</section>
+<!-- Recently Added Section -->
+<section class="flex flex-col gap-stack-sm">
+<div class="flex justify-between items-end px-1">
+<h2 class="font-title-md text-title-md font-bold text-primary">Recently Added</h2>
+<button class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors">See All</button>
+</div>
+<!-- Grid Layout -->
+<div class="grid grid-cols-2 gap-4">
+<!-- Album Card 1 -->
+<div class="flex flex-col gap-2 group cursor-pointer">
+<div class="relative aspect-square rounded-xl overflow-hidden glass-panel">
+<img alt="Album Art" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 opacity-90 group-hover:opacity-100" data-alt="A moody, cinematic photograph of an Indian musician performing on stage. Deep blue and purple stage lights cast dramatic shadows, illuminating the artist holding a microphone. High contrast, atmospheric fog, intense emotion, premium concert photography style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA60CayRbAujEXmM4vMpx7HjbHndCHEDs5W-f2vFBYwkKbjWQDcBevgtRHrXgJMBRVZDxd0EAp-8t39exU2BExOrKbDq4Lhs39Ko2GufSoywZHQyr3ttw_-ktbJ3ALnTis4cQPOyb1lLVjbT1tJWPnN_P68VY4bqtGKRYvmOukB9yEZm_asTKmJBfj-gvUGc9xpQJj4JuZehoJ2DkWGpA5JQKud5C9mECmcQO1eGMcb-eW8uhfzIlsv6OhXD0j27vUtViAUBypy98M"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+<button class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<div>
+<h3 class="font-body-lg text-body-lg font-semibold text-primary truncate">Rockstar (Original Motion Picture Soundtrack)</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">A.R. Rahman</p>
+</div>
+</div>
+<!-- Album Card 2 -->
+<div class="flex flex-col gap-2 group cursor-pointer">
+<div class="relative aspect-square rounded-xl overflow-hidden glass-panel">
+<img alt="Album Art" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 opacity-90 group-hover:opacity-100" data-alt="A minimalist close-up portrait of a singer in a studio setting. Monochromatic dark aesthetic with a single sharp spotlight highlighting the facial features and a vintage studio microphone. Sleek, intimate, premium visual style, deep shadows." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWSiAK7_fUo1k-ogGcP1nYJ-HaeN_jMozPgXGfJSK2n8yB8KUJqRGFpHsp9UslXE0hW9upUzp6fMkB_dtUaXayVIah5MN5VrLnJswpx5bUOKLjrl2UPHO4mS8S_MUsT-6WstfNlT4ilyro3P44wd_4jF7f1LZ8tn2iL_ldOX5_0M3SV7-VQogG7LBoqTLxbuCRV_udyNUq6gjZxxv7aPkaJVQ3bANMsl11Wu-FYyJyZSKMGR03pZcrZL5gcLHt8QYUrnt7ZQPx0R0"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+<button class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<div>
+<h3 class="font-body-lg text-body-lg font-semibold text-primary truncate">Aashiqui 2</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Arijit Singh, Mithoon</p>
+</div>
+</div>
+<!-- Album Card 3 -->
+<div class="flex flex-col gap-2 group cursor-pointer">
+<div class="relative aspect-square rounded-xl overflow-hidden glass-panel">
+<img alt="Album Art" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 opacity-90 group-hover:opacity-100" data-alt="Abstract musical concept art. Deep obsidian background with glowing, ethereal threads of golden light forming the shape of soundwaves or a musical clef. Glassmorphic elements, cinematic lighting, 3D render feel, highly polished and luxurious aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTxykYR2K7XNXFQnc4A1kRUhsAir60lVJApfI_y5r47sRFELWxgrxScpDpB6lJHtbMsyM0pJmikfeu3nBV0YjqJFnowhqgC-Z2uFh2MyEb8d1yV1OJmVisOL7hAjxTgyu12iF5Bl3tFKxcHPwvI3MRjW2Oir7jV1J2L0lYMR-vntGIbtP6DtWGEU0URrcwxiNd8vRcf0ABh3GZ7Ho7Dmdyxo3l-5hwcEYorFweRwb_C8H-ul6i9X7ToglctsohDHsLGKbJiYBro1g"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+<button class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<div>
+<h3 class="font-body-lg text-body-lg font-semibold text-primary truncate">Lofi Chill Beats</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Gravity Curated</p>
+</div>
+</div>
+<!-- Album Card 4 -->
+<div class="flex flex-col gap-2 group cursor-pointer">
+<div class="relative aspect-square rounded-xl overflow-hidden glass-panel">
+<img alt="Album Art" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 opacity-90 group-hover:opacity-100" data-alt="A grand piano illuminated by soft moonlight in an otherwise pitch-black room. Cinematic, high-fidelity image with subtle reflections on the glossy wood. The mood is solitary, contemplative, and premium. Focus on the keys fading into darkness." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBWEiieWVW-KeE0XYFrwlgPos06QLp6hg96Yk14XGHIFcmZV2hB_VyOXYDhQhIMAqge0R7brU9fMlgRuxNMkS9rsAjdVlJUKhbhVe2DshjJAKWTicr7j4B4CxP_demXI-HzzD7PapdYS6MRhq1loZIOxsuG2_IoqTDMB6CLMoe4gWEZvdxdzPRqmzM3Y-ldhVEVzb70TJwcbTmcbgW7CZF3Co77LHlXaPRp9GzFz9BwtF5JiEJ6sU1xkMSv7vTi1LneVwIBqtCdH34"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+<button class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<div>
+<h3 class="font-body-lg text-body-lg font-semibold text-primary truncate">Midnight Piano</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Various Artists</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Floating Mini Player -->
+<div class="fixed bottom-[calc(4rem+2.5rem)] left-0 right-0 z-50 px-screen-margin pointer-events-none w-full max-w-2xl mx-auto">
+<div class="glass-panel rounded-xl flex items-center p-2 pr-4 shadow-[0px_8px_40px_rgba(0,0,0,0.5)] pointer-events-auto relative overflow-hidden">
+<!-- Tiny progress bar at the absolute bottom -->
+<div class="absolute bottom-0 left-0 h-[2px] bg-white/20 w-full">
+<div class="h-full bg-primary w-1/3 rounded-r-full"></div>
+</div>
+<div class="w-12 h-12 rounded-lg overflow-hidden shrink-0">
+<img alt="Now Playing" class="w-full h-full object-cover" data-alt="A moody, cinematic photograph of an Indian musician performing on stage. Deep blue and purple stage lights cast dramatic shadows. High contrast, atmospheric fog, premium concert photography style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZ_Skf2J-rl-SCQxcXWpbrR44miPOkqzjpqJKM9KjIrdlZFqm8rU_Q9Uo9AxDQyKc30COEeLfuHgKBuzFS3fnJc4UKDCme4fuTkJyUegOnnHrB5W1YkElQuIZgEVFD6GdLP0rqNNGh2NFFhV-ibEV_zM4niQSmOqUAhOTrUPgosKp5sJxwwLkTwpv1xVDlvUBeyjSeKKtEab1UC0kVJSI1_oGfC8xSJ8052vwYTEvaW0Nw7EFFhJdWgDX1hCN7S9W1vf5e3gkQLoI"/>
+</div>
+<div class="ml-3 flex-1 min-w-0">
+<h4 class="font-body-sm text-body-sm font-semibold text-primary truncate">Kun Faya Kun</h4>
+<p class="text-[10px] text-on-surface-variant truncate leading-tight">A.R. Rahman, Javed Ali, Mohit Chauhan</p>
+</div>
+<div class="flex items-center gap-3 shrink-0 ml-2">
+<button class="w-8 h-8 flex items-center justify-center text-primary opacity-80 hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined" style="font-size: 20px; font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center text-primary opacity-80 hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined" style="font-size: 20px; font-variation-settings: 'FILL' 1;">skip_next</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Bottom Navigation Shell - Floating -->
+<nav class="fixed bottom-0 left-0 right-0 z-50 flex justify-around items-center px-4 bg-white/10 dark:bg-black/10 backdrop-blur-3xl rounded-full mx-screen-margin mb-screen-margin h-16 border border-white/12 shadow-2xl w-[calc(100%-2.5rem)] max-w-2xl md:mx-auto">
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:bg-white/20 transition-colors w-16 h-12 rounded-xl" href="#">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="font-label-caps text-[10px] leading-none">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:bg-white/20 transition-colors w-16 h-12 rounded-xl" href="#">
+<span class="material-symbols-outlined mb-1">search</span>
+<span class="font-label-caps text-[10px] leading-none">Search</span>
+</a>
+<!-- Active State -->
+<a class="flex flex-col items-center justify-center bg-white/10 text-primary rounded-full px-4 py-1 hover:bg-white/20 transition-colors scale-95 duration-100" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">library_music</span>
+<span class="font-label-caps text-[10px] leading-none">Library</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:bg-white/20 transition-colors w-16 h-12 rounded-xl" href="#">
+<span class="material-symbols-outlined mb-1">queue_music</span>
+<span class="font-label-caps text-[10px] leading-none">Queue</span>
+</a>
+</nav>
+<script>
+        // Simple touch feedback for glass elements
+        document.querySelectorAll('.glass-panel, .glass-button').forEach(el => {
+            el.addEventListener('touchstart', () => {
+                el.style.transform = 'scale(0.98)';
+                el.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+            });
+            el.addEventListener('touchend', () => {
+                el.style.transform = 'scale(1)';
+                el.style.backgroundColor = '';
+            });
+        });
+    </script>
+</body></html>

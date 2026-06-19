@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Gravity Music - Search</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-surface": "#e5e2e1",
+                        "on-error": "#690005",
+                        "tertiary-fixed": "#e5e2e1",
+                        "surface-container-lowest": "#0e0e0e",
+                        "primary": "#ffffff",
+                        "inverse-on-surface": "#313030",
+                        "on-surface-variant": "#c4c7c8",
+                        "on-tertiary": "#313030",
+                        "surface-variant": "#353434",
+                        "on-background": "#e5e2e1",
+                        "on-secondary-container": "#bab8b7",
+                        "surface-tint": "#c6c6c7",
+                        "primary-fixed": "#e2e2e2",
+                        "on-primary": "#2f3131",
+                        "on-tertiary-container": "#656464",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "tertiary-container": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "outline-variant": "#444748",
+                        "on-secondary-fixed-variant": "#474646",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-container-highest": "#353434",
+                        "inverse-primary": "#5d5f5f",
+                        "secondary": "#c9c6c5",
+                        "tertiary": "#ffffff",
+                        "surface-dim": "#141313",
+                        "surface-container-high": "#2a2a2a",
+                        "primary-fixed-dim": "#c6c6c7",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-primary-container": "#636565",
+                        "outline": "#8e9192",
+                        "on-primary-fixed": "#1a1c1c",
+                        "surface-bright": "#3a3939",
+                        "tertiary-fixed-dim": "#c8c6c5",
+                        "on-secondary": "#313030",
+                        "error": "#ffb4ab",
+                        "surface": "#141313",
+                        "secondary-fixed-dim": "#c9c6c5",
+                        "on-tertiary-fixed-variant": "#474746",
+                        "on-primary-fixed-variant": "#454747",
+                        "secondary-container": "#4a4949",
+                        "primary-container": "#e2e2e2",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-low": "#1c1b1b",
+                        "background": "#141313",
+                        "surface-container": "#201f1f",
+                        "on-tertiary-fixed": "#1c1b1b"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "screen-margin": "1.25rem",
+                        "stack-lg": "2.5rem",
+                        "gutter": "1rem",
+                        "stack-sm": "0.5rem",
+                        "stack-md": "1.5rem"
+                    },
+                    fontFamily: {
+                        "headline-lg-mobile": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "display-hero": ["Inter"],
+                        "title-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    fontSize: {
+                        "headline-lg-mobile": ["28px", { "lineHeight": "34px", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "display-hero": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "title-md": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Ambient Background Glow */
+        body {
+            background-color: #000000;
+            background-image: radial-gradient(circle at 50% 0%, rgba(45, 20, 80, 0.3) 0%, transparent 70%);
+            background-attachment: fixed;
+        }
+
+        /* Glass layer utility classes (Z2) */
+        .glass-layer {
+            background-color: rgba(255, 255, 255, 0.10);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0px 8px 40px rgba(0, 0, 0, 0.25);
+        }
+
+        /* Hide Scrollbar */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        /* Interactive State */
+        .interactive-glass:active {
+            background-color: rgba(255, 255, 255, 0.16);
+            transform: scale(0.98);
+            transition: all 0.15s ease-out;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface font-body-lg min-h-screen overflow-x-hidden pb-40">
+<!-- TopAppBar -->
+<header class="fixed w-full top-0 pt-screen-margin z-40 bg-transparent flex justify-between items-center px-screen-margin transition-opacity">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full overflow-hidden bg-surface-container-highest">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A striking digital portrait photography of a sophisticated individual in a high-end, modern light-mode studio. The lighting is soft yet cinematic, casting subtle deep black and crisp white shadows. The mood is serene and technologically advanced, fitting a premium digital interface aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBU3d1j8DVtH0Ru56Z9iSdBWhKxtQ_hbFxn_FHCwpzew3UpGfySOZ31Ns8tK4XPugu0w7V7l-Er6zYNm3AJHTQ0MiVqu29LnTat4MVfsCjVXxfpNJWcyYE-xoi8qx0tWIDFJVXdSnx4IOkAEEJm24lY5QCYIfWp4-5CL_rrlRc0owTuIsJQ_6vkD8zS0EX4M6hMQWWz6Fod4ic3ezKMJfOlocMuHvgVA16b1lb0bCQOqJa5itOdhW19EOQd6ouk1IPDPpSN9CARhhM"/>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary">Gravity</h1>
+</div>
+<button aria-label="Search" class="material-symbols-outlined text-primary dark:text-primary text-[24px] hover:opacity-80 transition-opacity active:scale-95 duration-150">search</button>
+</header>
+<!-- Floating Search Pill -->
+<div class="mt-[90px] mx-screen-margin relative z-30">
+<div class="glass-layer rounded-full h-14 flex items-center px-4 w-full">
+<span class="material-symbols-outlined text-white/40 mr-3 text-[24px]">search</span>
+<input class="bg-transparent text-primary placeholder:text-white/40 outline-none w-full font-body-lg" placeholder="Artists, songs, or lyrics" type="text"/>
+<button class="material-symbols-outlined text-white/40 hover:text-white transition-colors ml-2">mic</button>
+</div>
+</div>
+<!-- Content Canvas -->
+<main class="mt-stack-md flex flex-col gap-stack-lg">
+<!-- Recent Searches -->
+<section>
+<h2 class="font-title-md text-title-md text-primary px-screen-margin mb-stack-sm">Recent Searches</h2>
+<div class="flex overflow-x-auto no-scrollbar px-screen-margin gap-4 pb-4">
+<div class="flex flex-col items-center gap-2 shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+<div class="w-16 h-16 rounded-full overflow-hidden border border-white/5 bg-[#0B0B0B]">
+<img alt="Artist" class="w-full h-full object-cover" data-alt="A moody, cinematic portrait of a musician in a dark studio illuminated by subtle neon rim lights. The image features deep blacks and vibrant but isolated color accents, conveying a premium audio experience. The composition focuses heavily on the atmosphere and artistic aura." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmhsvJ35e8PcbiSaMFI_TCKWYn0Dp-u8fmdCb68N7Sk0cuMJ5sUFv0mX4DsxBstN0XCVuFhKEneut0a6BcSXys0KzyFl95WFOJ6wvakvpncE_O5El72YEXQl5XyWMVbDirAYtcKgJFiqxRX7S4wYgNpSAdLF8Twvr65naT0_fNa4Fz-siDnE9wOiXmBdPLIzdPtgKoVb9_g3Jiv5a575pha3rSDSZLuOx5NRsZL6xyWD4QQiQFRTUyavGqW29eSsCH8CCCb4qeVAI"/>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Odesza</span>
+</div>
+<div class="flex flex-col items-center gap-2 shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+<div class="w-16 h-16 rounded-full overflow-hidden border border-white/5 bg-[#0B0B0B]">
+<img alt="Artist" class="w-full h-full object-cover" data-alt="An abstract, high-fidelity visual representation of electronic music. Deep obsidian black background punctuated by razor-thin, glowing bright white sound waves. The aesthetic is clean, minimalist, and perfectly suited for a high-end digital music platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCSTRPpfZNb3NOKWopCRPAc6TY_fcDcx_AgrEi0m4unqcTAfTFNLpfZdNRmBYY_LjI0IXdEgO4VomgqPKnKe8CdrtGsDoFk14-p-ZLIDFHSj4ySqu71F4ptLP6d619DU3Pbp71s0AZZ9S41SOzDkOQOPr0gUr0eeljWxzYT8i2MWFoyZqhJWrbs0WirB-HiYAE_3q-XF6cZorYOBocHHTE1bgOhPHYtU3XEO1cf38qJSNks7yfV0ZvZw5NQsLI5a48qNsjpX4t7-x0"/>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Daft Punk</span>
+</div>
+<div class="flex flex-col items-center gap-2 shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+<div class="w-16 h-16 rounded-full overflow-hidden border border-white/5 bg-[#0B0B0B]">
+<img alt="Artist" class="w-full h-full object-cover" data-alt="A striking digital installation art piece featuring glowing, generative geometric shapes suspended in a vast, minimalist gallery space. The room is illuminated by high-key, soft white lighting that creates a bright, modern light-mode aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAkkGI59012tdBnHiqac12XYouzebDGDLEraV7LqsBj6Uk50-2FoIRnvcmg5GwNCBXOcLgFR2agLVBnNrTIy2q_lfgy9lvd2JdIbKlOuSAttoEtW1Os301yYBJqoRm58BxyhXyGUGtWVjVxpgjBX1wpzlwT3kuYoof0Y91EtQ6F3PDFuK5bDNyxbJ-oxfy74pgCP0Tmfwg1R9AQn_a7noah4xpouaiFu_ZmSF9uAlxX7z-tQn70StuRk6jTNdpNq51b7y5JT-rDLA"/>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Rufus Du Sol</span>
+</div>
+<div class="flex flex-col items-center gap-2 shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+<div class="w-16 h-16 rounded-full overflow-hidden border border-white/5 bg-[#0B0B0B]">
+<img alt="Artist" class="w-full h-full object-cover" data-alt="Cinematic shot of a DJ mixing board in a dark, atmospheric club environment. Shallow depth of field blurs the background into smooth bokeh of neon lights. The foreground features stark contrast with deep shadows and crisp highlights on the metal dials." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnelGNU-A6d4V0SrqvFOEVdm6m5_G2wcf-Q5exz5cK1zoMktTL531HEIOG9JFPrhRI0hyOCg-UW4XltDqClhwVoBkkAUzEwEqfbh-DgNbhVFTzD_hhTjSShiYb5MLxxQaibfmYBJYuIEhyN3hG7ok5QPADEFFx7nYDu1438IvXsXvqoxZYqeJLZFR-QaQ23NL-X_jja920AvcPb9tjbU166OrxPBfrAb2xfuxtdxXzi1Ep2Jdl2pT6n0Wzv1OsY_JnAxRDTch57ts"/>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Bicep</span>
+</div>
+</div>
+</section>
+<!-- Trending Categories -->
+<section class="px-screen-margin">
+<h2 class="font-title-md text-title-md text-primary mb-stack-sm">Trending</h2>
+<div class="grid grid-cols-2 gap-4">
+<div class="relative h-24 rounded-xl overflow-hidden bg-[#0B0B0B] group cursor-pointer shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]">
+<img alt="Pop" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-300 mix-blend-luminosity" data-alt="Vibrant pop music visualizer concept. A sleek, suspended orb emitting soft neon pink and blue light against a pure black void. The lighting creates a high-end, atmospheric layering effect consistent with premium audio software." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBj64bBBqfqNM7oCsFwwJ23k-gLAl-lKb_QLDfsVCByti9sbj5pfX6tBfFssYdaVVccPtVLWI3CA2arp1_ozTcZzs6r3WiTtWc2gE_hGhlAiAqRZIuxZ43282voERvR6PfCvU7TQv1aGG8yoogtodt-BwnpvHvV9uGRcDoR4yskEG_8PRoGD2RABxR2w3OvFu1qi5P_33e4gWeUBBUU1wvL71rpzajsTx6-Bo1S_RSjK2a66Q-uZgcNzU8W187lfaDs3MfEzx5ctc4"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+<span class="absolute bottom-3 left-4 font-title-md text-title-md text-primary z-10">Pop</span>
+</div>
+<div class="relative h-24 rounded-xl overflow-hidden bg-[#0B0B0B] group cursor-pointer shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]">
+<img alt="Hip-Hop" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-300 mix-blend-luminosity" data-alt="Urban hip-hop mood board aesthetic. Deep, moody shadows over a concrete texture, illuminated by a single, sharp beam of amber light. The composition is minimal, relying on stark contrast and Z-axis depth to create visual interest." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBbV7OOsZBu82t1_kEJHy21MKWzFCAhkI4sLpnIZ8MI7kbMMEzf3XM0_ZLQ36vZ0Gkx3lPyLuYSX076afbREFF_irKUG7eeWHZ1G1GoSU9ihObY6_f0plk6UiQZPUyYbw86e_NY9iSyFUs5X6tg6ltx9G4iXXOp3R3lPbU0aE45xZ7IO4248NbYo_3P72TeXq-iNw635uXw5HktYK3faUzF79jDOa0xos6Lp0bitAsdfUZKdc_XXVhwStSAB95enQ8xv7iS1kOv28"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+<span class="absolute bottom-3 left-4 font-title-md text-title-md text-primary z-10">Hip-Hop</span>
+</div>
+<div class="relative h-24 rounded-xl overflow-hidden bg-[#0B0B0B] group cursor-pointer shadow-[inset_0_0_20px_rgba(255,255,255,0.05)] col-span-2">
+<img alt="Electronic" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-300 mix-blend-luminosity" data-alt="A striking digital installation art piece featuring glowing, generative geometric shapes suspended in a vast, minimalist gallery space. The room is illuminated by high-key, soft white lighting that creates a bright, modern light-mode aesthetic. The artwork relies on a sophisticated palette of deep blacks and pristine whites." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUXwzAPdTqsx2ZUcu7aqTPDGO5jvJwTtJktzZHbhoAeIF-zXoAS1FuNrGVIYv_hn58xY4xLnNCrtL3_jORDx5cHvgEqaROkK9mye0RuudhCby11xMTkEYrtxgwvknePQofL3izl9nG7DipMCs33OJpTETCNklibLupgaHMLzAjl-S2kPbuy77b4nckFdL8V6Pl7MXh9o5mr-lNvgjjUJMWLJBp-PH8tYE5uh4wHrfi8hlwqmSFFM2NlU-BaaccYdtFlzFT1qQM1ok"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+<span class="absolute bottom-3 left-4 font-title-md text-title-md text-primary z-10">Electronic</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Floating Mini-Player -->
+<div class="fixed bottom-[96px] left-screen-margin right-screen-margin z-40 glass-layer rounded-[1rem] h-[64px] flex items-center px-3 interactive-glass overflow-hidden cursor-pointer group">
+<div class="w-10 h-10 rounded-md overflow-hidden shrink-0 shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+<img alt="Now Playing" class="w-full h-full object-cover" data-alt="Abstract album artwork featuring deep obsidian textures with a subtle inner glow of warm amber. The design is sleek, completely borderless, and creates a sense of profound depth against a dark background, fitting a premium audiophile platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvZ_6xXaDQpWcVnKmDHxam82ZnVteXa0de66ndILyx-BvjA8F3lWaDdCuRAxv86TBP0aM0W3gOdCrIWYnvrwyms8MOCkLF2iCAS_2IBsEQLdkR4asw6w8mNoHaPwG48llaCNPYAVCLYTOar2uThowgOy5HY1rDlsHLrXCGW3WAkHwWOpgWVFnMUgEGwA8sMBssR6-hcfTdq9FTJ0rsdr7OwX53WpvH_X1pDHySPSR-jdQdikJPTw7Wz5qbDIs4aLyqj9lrE77Bih0"/>
+</div>
+<div class="ml-3 flex-1 overflow-hidden">
+<div class="font-title-md text-[14px] text-primary truncate leading-tight">Innerbloom</div>
+<div class="font-body-sm text-[12px] text-on-surface-variant truncate">RÜFÜS DU SOL</div>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-primary hover:bg-white/20 transition-colors ml-2 z-10">
+<span class="material-symbols-outlined text-[20px]" data-weight="fill" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<!-- Progress Bar at the very bottom -->
+<div class="absolute bottom-0 left-0 right-0 h-[2px] bg-white/10">
+<div class="h-full bg-primary w-[35%] rounded-r-full"></div>
+</div>
+</div>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 right-0 z-50 flex justify-around items-center px-4 rounded-full mx-screen-margin mb-screen-margin h-16 bg-white/10 dark:bg-black/10 backdrop-blur-3xl border border-white/12 shadow-2xl">
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:bg-white/20 transition-colors rounded-lg p-2 w-16" href="#">
+<span class="material-symbols-outlined text-[24px]">home</span>
+<span class="font-label-caps text-[10px] mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-white/10 text-primary rounded-full px-4 py-1 w-16 active:scale-95 duration-100" href="#">
+<span class="material-symbols-outlined text-[24px]" data-weight="fill" style="font-variation-settings: 'FILL' 1;">search</span>
+<span class="font-label-caps text-[10px] mt-1">Search</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:bg-white/20 transition-colors rounded-lg p-2 w-16" href="#">
+<span class="material-symbols-outlined text-[24px]">library_music</span>
+<span class="font-label-caps text-[10px] mt-1">Library</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:bg-white/20 transition-colors rounded-lg p-2 w-16" href="#">
+<span class="material-symbols-outlined text-[24px]">queue_music</span>
+<span class="font-label-caps text-[10px] mt-1">Queue</span>
+</a>
+</nav>
+</body></html>

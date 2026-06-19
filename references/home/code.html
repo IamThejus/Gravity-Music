@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Gravity Music - Home</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface": "#e5e2e1",
+                        "on-error": "#690005",
+                        "tertiary-fixed": "#e5e2e1",
+                        "surface-container-lowest": "#0e0e0e",
+                        "primary": "#ffffff",
+                        "inverse-on-surface": "#313030",
+                        "on-surface-variant": "#c4c7c8",
+                        "on-tertiary": "#313030",
+                        "surface-variant": "#353434",
+                        "on-background": "#e5e2e1",
+                        "on-secondary-container": "#bab8b7",
+                        "surface-tint": "#c6c6c7",
+                        "primary-fixed": "#e2e2e2",
+                        "on-primary": "#2f3131",
+                        "on-tertiary-container": "#656464",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "tertiary-container": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "outline-variant": "#444748",
+                        "on-secondary-fixed-variant": "#474646",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-container-highest": "#353434",
+                        "inverse-primary": "#5d5f5f",
+                        "secondary": "#c9c6c5",
+                        "tertiary": "#ffffff",
+                        "surface-dim": "#141313",
+                        "surface-container-high": "#2a2a2a",
+                        "primary-fixed-dim": "#c6c6c7",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-primary-container": "#636565",
+                        "outline": "#8e9192",
+                        "on-primary-fixed": "#1a1c1c",
+                        "surface-bright": "#3a3939",
+                        "tertiary-fixed-dim": "#c8c6c5",
+                        "on-secondary": "#313030",
+                        "error": "#ffb4ab",
+                        "surface": "#141313",
+                        "secondary-fixed-dim": "#c9c6c5",
+                        "on-tertiary-fixed-variant": "#474746",
+                        "on-primary-fixed-variant": "#454747",
+                        "secondary-container": "#4a4949",
+                        "primary-container": "#e2e2e2",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-low": "#1c1b1b",
+                        "background": "#141313",
+                        "surface-container": "#201f1f",
+                        "on-tertiary-fixed": "#1c1b1b"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "screen-margin": "1.25rem",
+                        "stack-lg": "2.5rem",
+                        "gutter": "1rem",
+                        "stack-sm": "0.5rem",
+                        "stack-md": "1.5rem"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "display-hero": ["Inter"],
+                        "title-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["28px", { "lineHeight": "34px", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "display-hero": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "title-md": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* Atmospheric Gradient */
+        .ambient-glow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.15) 0%, rgba(0, 0, 0, 0) 50%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Hide scrollbar for horizontal scrolling */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Glassmorphism utilities */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        
+        .glass-card {
+            background: rgba(20, 19, 19, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        
+        .image-glow {
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="antialiased overflow-x-hidden selection:bg-primary/30">
+<div class="ambient-glow"></div>
+<!-- TopAppBar -->
+<header class="docked full-width top-0 pt-screen-margin z-40 bg-transparent flex justify-between items-center px-screen-margin w-full fixed">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-white/20 glass-card">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A cinematic, high-quality close-up portrait of a user profile picture. The lighting is soft and moody, fitting a premium dark-mode aesthetic. The background is slightly blurred to focus on the subject." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYFwl66RkHOpnQNC88XMG906ZJ_WHCWCtWiE6wNk1vUc8vewXkn5N_JwgAuzwxYz3cuDkp33q-kIbVkvTu4m9GNyM59pzozh0vOVnRcjeWiExmypXSOZYDLDovnde4oXzCytDwVmNzJOTb2NcnBEvzZY6BKCSYiAhV07xZZv4Wbx7gJVIK7HaWRDhDPQWqHSQP5Jaez_Mwr8CjNIyekhNbcCNFpH9qPw4xnMIMlvJMR4yAeA9k9xN6irCx06GZniylyHqR1ODFzpY"/>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary">Gravity</h1>
+<button class="w-10 h-10 rounded-full flex items-center justify-center glass-panel text-primary hover:opacity-80 transition-opacity active:scale-95 duration-150">
+<span class="material-symbols-outlined">search</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-[calc(env(safe-area-inset-top)+80px)] pb-[180px] px-screen-margin flex flex-col gap-stack-lg">
+<!-- Greeting -->
+<section>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-primary tracking-tight">Good Evening</h2>
+</section>
+<!-- Recently Played (Horizontal Scroll) -->
+<section class="-mx-screen-margin px-screen-margin">
+<div class="flex overflow-x-auto hide-scrollbar gap-gutter pb-4">
+<!-- Item 1 -->
+<div class="flex-none w-32 flex flex-col gap-stack-sm group cursor-pointer">
+<div class="w-32 h-32 rounded-xl overflow-hidden image-glow relative shadow-2xl">
+<img alt="After Hours" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A stylized, moody album cover featuring neon red lighting against a dark background, reminiscent of 80s synth-pop or modern R&amp;B. The visual style is premium and cinematic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbLP_HKYYQmeUcv2Ytqzh2c04RibtZhsaU_ILSEj8g3wqbd7OpEKxqspe4ksKM960_OlXj5dLVEvMsT0fFZxw1W0_6iRE2YnGvoU8TYSozzP4zUJhDKFZwG6oFOgkoMleYTmEqT2XgL4e4hyGMmt_bCHVF0XG2Ama9q-3j4rQQKo3MHI5aBm2cjFnsJfCzg3JsMb7M9fDGa9F7UEF5Hoz8BSr2lJ9td2gHVGMl0yU0iIkAyk_MC5ZQbRTn18bXhOpL_fh5FeGAvEU"/>
+<div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-300"></div>
+</div>
+<div>
+<p class="font-title-md text-title-md text-primary truncate">After Hours</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">The Weeknd</p>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex-none w-32 flex flex-col gap-stack-sm group cursor-pointer">
+<div class="w-32 h-32 rounded-xl overflow-hidden image-glow relative shadow-2xl">
+<img alt="Future Nostalgia" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A vibrant, energetic album cover with a retro-futuristic aesthetic. Bright pinks and blues against a dark canvas, highly polished and glamorous, fitting a premium music interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuATSCODapTnObyoiYnEz0tcKQzysL6Cr6d2TI2kOhFYMynyWVUQjXcNabiHELZl36UacwCFwr4jSRBA3IMqVLBjKAQwHFx9eVqGegskoDKg9q0H7JaHQdxqPQQMTmynVqrna8PEWvR0Fj-tz3QZxXLCrfSEkxxcFX2jK7q1qNsG1R4buyBicWizcISryg2DaSuLemcU8U2aIvawy1kEV3qWlLiMoAdEBaNOWK_wFoqlgB7KOSe-c6ffXvkkm4oUQlNyYn99FHgjKeI"/>
+<div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-300"></div>
+</div>
+<div>
+<p class="font-title-md text-title-md text-primary truncate">Future Nostalgia</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Dua Lipa</p>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex-none w-32 flex flex-col gap-stack-sm group cursor-pointer">
+<div class="w-32 h-32 rounded-xl overflow-hidden image-glow relative shadow-2xl">
+<img alt="Midnights" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A moody, atmospheric album cover focusing on a deep blue and silver color palette. It has a late-night, introspective feel with soft lighting and a slightly grainy, filmic texture." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwXLh-HACCvAB2FLW9s-MQgUgxp7AgPe0JxdTXExKeEJai9jpsLENjCJr81y5pgMP7vOWqgGFOuWv9eqU5ljW8NTWaOdSCWUZ7m6lfn76LYU6SIV9RA5A_Wj4RT-tszwvJSFn2UM2m-1MQoqeNIZunBrBbsKdN0-6XQ-at5GZ9FrLOWn44mR2FA7elT7Q7KTw_8EgUQzxE0S_CAIxQAtErYQVaLqegdjDwsTE8FzamkT7G2nrR43p-1PgB2JF-XqjYMZUoLRRSmig"/>
+<div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-300"></div>
+</div>
+<div>
+<p class="font-title-md text-title-md text-primary truncate">Midnights</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Taylor Swift</p>
+</div>
+</div>
+<!-- Item 4 -->
+<div class="flex-none w-32 flex flex-col gap-stack-sm group cursor-pointer pr-screen-margin">
+<div class="w-32 h-32 rounded-xl overflow-hidden image-glow relative shadow-2xl">
+<img alt="Currents" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Abstract, psychedelic album cover art featuring fluid dynamics and swirling colors. The palette is rich with deep purples and bright yellows, evoking a sense of motion and modern psychedelic rock." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCui9VDyb8zDfD4bXhzn-Q7AxuxiS85RdIgIAaOJK1SR8-4Qz8w7TTVhkgM9piq3dov3iD4nJVmcJaN3DhABQOOJGQNiXBZRJWb3kJ-5zjVCH9DjhOoWDAkDN1bGtpjZcuMASqJcGzK9X2Eg7WR80FaBJ9MxNToGr2tViFiZEamPKV5Uk2y4a8a9FzCcVlQo1urKcxnon6J5LSMmtlN4eKxM0_pq7cy4kb0cJ6obVizFLfhyjBLEwSyFhHEoEypI3eGzEKSqu4KXtM"/>
+<div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-300"></div>
+</div>
+<div>
+<p class="font-title-md text-title-md text-primary truncate">Currents</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Tame Impala</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Made For You (Bento Grid) -->
+<section class="flex flex-col gap-stack-md">
+<h3 class="font-title-md text-title-md text-primary">Made For You</h3>
+<div class="grid grid-cols-2 gap-gutter">
+<!-- Large Card -->
+<div class="col-span-2 aspect-[2/1] rounded-xl overflow-hidden relative group cursor-pointer">
+<img alt="Daily Mix 1" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" data-alt="An energetic concert scene bathed in deep blue and purple stage lights. A silhouette of a DJ or performer is visible against a bright backdrop, capturing the live music experience in a premium dark aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlSiRZdm3SPv9hdeXKfW1h5_a3ozi7iBOIrwNVwWMSNE0HxnnFu5dZ2OgQeTek2vGei3Mume0eGND7QDh_3f6mYSSpoUM7xHBargCvIl-5nUI3zELxSOPxKXdaKU-zMXSsBJe_YdBcFsukABf1oZRjjT9Qrsm-wTCzVaBirE8eYEjG16d8XUspziCUFvqxzAvCa72XRozWmMcNgj-2m93ikCtV9LrNkwtyMrU3RMJTpUI-Oeb-ydkiyCyIPPRAoBM_qGpN5K5iTZs"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+<div class="absolute bottom-4 left-4 right-4">
+<p class="font-label-caps text-label-caps text-primary/80 mb-1">PLAYLIST</p>
+<p class="font-headline-lg-mobile text-headline-lg-mobile text-primary">Daily Mix 1</p>
+</div>
+</div>
+<!-- Small Card 1 -->
+<div class="aspect-square rounded-xl overflow-hidden relative group cursor-pointer">
+<img alt="Discover Weekly" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" data-alt="A minimalist, abstract music visualizer style image. Dark background with subtle neon geometric shapes floating, representing algorithms and discovery. Clean, sleek, and modern." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA6meiXAEtnpl_EqkMc2IJAbTiZKVd3XyvW1fSi_NwtDeMY5LZoeJoxm_dn6Q9AD849SSi2XlNfSP0VShcKoQWdCQ6CaPIdE-co5kjIxMoSlvDlZdNGGniqgxEQFFol_iGWtuqa63AnJ_Sx_4NXwd6jHyHfXFRnOlQXn_gQVRlmMFUfDAokn281BVlli3A9NpJ8wCJwxakg46CTTlcK0JpzPBdrBNcQtLJo-iKOKHcDguwBNXBqh2otMeZgJgkuhgFU_Raz6qhKzEc"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+<div class="absolute bottom-3 left-3 right-3">
+<p class="font-title-md text-title-md text-primary leading-tight">Discover<br/>Weekly</p>
+</div>
+</div>
+<!-- Small Card 2 -->
+<div class="aspect-square rounded-xl overflow-hidden relative group cursor-pointer">
+<img alt="Release Radar" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" data-alt="A close-up of a vinyl record playing on a high-end turntable, softly lit by a warm, ambient glow in a dark room. The mood is sophisticated and focused on high-fidelity audio." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPOXsvg5xBA5i-YMhjLCZhsdGbkzHriWIN6MlZcsbN6CzmNUC0Q89gIzwMTuCA-7QniTCzh8Vcr7kuoCqWIKy8XQ5DqEAPw34EjCgqdSZgw7Yt1en7_xjyg31RLZ_EIyAQEDVkzb13uvymZ2phuBBCdvUanCAKx6u7wbYjNxfF3A8S2tSA9DwJSbS23-xbQnaOqcNRvYhHPKGLD8ZGAo2OmAH-FDFWWnb95AysppfT-OmjvCNJ0oXPfauzPO6vgbvLCWHsV0lRsBw"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+<div class="absolute bottom-3 left-3 right-3">
+<p class="font-title-md text-title-md text-primary leading-tight">Release<br/>Radar</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Floating Mini-Player & Bottom Nav Container -->
+<div class="fixed bottom-0 left-0 right-0 z-50 flex flex-col px-screen-margin pb-screen-margin gap-3 pointer-events-none">
+<!-- Mini-Player (Z2 Glass Layer) -->
+<div class="glass-panel rounded-xl h-16 flex items-center px-3 justify-between shadow-[0px_8px_40px_rgba(0,0,0,0.25)] pointer-events-auto relative overflow-hidden group cursor-pointer hover:bg-white/[0.12] transition-colors">
+<!-- Progress Bar -->
+<div class="absolute bottom-0 left-0 h-[2px] bg-white/20 w-full">
+<div class="h-full bg-primary w-[45%]"></div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded shadow-md overflow-hidden relative">
+<img alt="Now Playing Cover" class="w-full h-full object-cover" data-alt="A small thumbnail of a stylized, moody album cover featuring neon red lighting against a dark background, reminiscent of 80s synth-pop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAb5tAlG6DPFkaE01S7qma_RyPolNy8rWoyyBGtfbZ1K0Eg8BYOIpVagTQsX759Uaiqb7AdvQKV-ITw9kUjRN3Fyw9jl3znZ9jNGhWYVc70wftLogkY8rIIyeH3vTFD3_GS94rVf5HlrgJb23_lgJCWMnhLV3xyefRwlW3DpSy72SsSkBTCnFL8dEnpfYwsr-MhhFxAGC3OVlipK1OFus7Wj2TSDjjED0ai5afyW3QKHjy8nbgv2m5TANeIIzeS-_zy9vplYmNSHN8"/>
+</div>
+<div class="flex flex-col max-w-[150px]">
+<p class="font-title-md text-[15px] font-semibold text-primary truncate">Blinding Lights</p>
+<p class="font-body-sm text-[13px] text-on-surface-variant truncate">The Weeknd</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="w-10 h-10 flex items-center justify-center text-primary rounded-full hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined" data-icon="speaker" style="font-variation-settings: 'FILL' 0;">speaker</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center text-primary rounded-full hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- BottomNavBar (Shared Component JSON) -->
+<nav class="bg-white/10 dark:bg-black/10 backdrop-blur-3xl rounded-full h-16 border border-white/12 shadow-2xl flex justify-around items-center px-4 pointer-events-auto w-full max-w-md mx-auto">
+<!-- Active Tab: Home -->
+<button class="flex flex-col items-center justify-center bg-white/10 text-primary rounded-full px-4 py-1 active:scale-95 duration-100 hover:bg-white/20 transition-colors">
+<span class="material-symbols-outlined" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-caps text-label-caps mt-1">Home</span>
+</button>
+<!-- Inactive Tab: Search -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:opacity-80 transition-opacity active:scale-95 duration-100 hover:bg-white/20 rounded-full px-4 py-1">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+<span class="font-label-caps text-label-caps mt-1">Search</span>
+</button>
+<!-- Inactive Tab: Library -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:opacity-80 transition-opacity active:scale-95 duration-100 hover:bg-white/20 rounded-full px-4 py-1">
+<span class="material-symbols-outlined" data-icon="library_music">library_music</span>
+<span class="font-label-caps text-label-caps mt-1">Library</span>
+</button>
+<!-- Inactive Tab: Queue -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:opacity-80 transition-opacity active:scale-95 duration-100 hover:bg-white/20 rounded-full px-4 py-1">
+<span class="material-symbols-outlined" data-icon="queue_music">queue_music</span>
+<span class="font-label-caps text-label-caps mt-1">Queue</span>
+</button>
+</nav>
+</div>
+</body></html>

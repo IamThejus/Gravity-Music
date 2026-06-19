@@ -654,9 +654,25 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
         if (!streamInfo.playable) {
           currentSongUrl = null;
+          // Debug aid: log the YouTube URL of the song that failed to play so
+          // unplayable (removed / region-locked / private) videos can be
+          // identified. Compiled out of release builds.
+
+
           _engine.setPhase(PlaybackPhase.error,
               reason: 'setSourceNPlay unplayable');
           Get.find<PlayerController>().notifyError(streamInfo.statusMSG);
+          // Broadcast the error state so the UI leaves the loading spinner.
+          // Without this, isSongLoading keeps the last-pushed processingState
+          // pinned to `loading` (no further playbackEvent fires after this
+          // early return), so a tapped-but-unplayable song spins forever.
+          // The other play paths (playByIndex/playAllFrom/playShuffled) already
+          // do this; setSourceNPlay was the one that didn't.
+          playbackState.add(playbackState.value.copyWith(
+            processingState: AudioProcessingState.error,
+            playing: false,
+            errorMessage: streamInfo.statusMSG,
+          ));
           return;
         }
 

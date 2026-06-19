@@ -1,0 +1,470 @@
+You are a senior Flutter, Android, AudioService, JustAudio, ExoPlayer, and mobile debugging engineer.
+
+Gravity Music currently has multiple production-critical playback issues reported by real users.
+
+Your objective is to identify the ACTUAL root causes using:
+
+* Code inspection
+* Runtime instrumentation
+* adb
+* adb logcat
+* Physical Android device testing
+* Real playback testing
+
+DO NOT GUESS.
+
+DO NOT PROVIDE THEORIES.
+
+DO NOT STOP AT STATIC CODE ANALYSIS.
+
+Every conclusion must be supported by:
+
+* Logs
+* Stack traces
+* Runtime evidence
+* Code references
+
+---
+
+# CONNECTED DEVICE
+
+A physical Android device is already connected.
+
+Use:
+
+```bash
+adb devices
+```
+
+Verify the device is available before starting.
+
+Use the physical device as the primary testing environment.
+
+Do NOT default to emulator testing unless the physical device becomes unavailable.
+
+Treat behavior on the connected device as the source of truth.
+
+---
+
+# REQUIRED INVESTIGATION APPROACH
+
+You MUST:
+
+1. Build the app
+2. Install it on the connected device
+3. Reproduce issues manually
+4. Collect adb logcat
+5. Add instrumentation where needed
+6. Identify root causes
+7. Implement fixes
+8. Rebuild
+9. Reinstall
+10. Verify fixes on-device
+
+Do not conclude the investigation until fixes are verified through real device testing.
+
+---
+
+# ISSUE 1 — FIRST-RUN PLAYBACK CRASH
+
+Observed behavior:
+
+Fresh install.
+
+Steps:
+
+1. Install app
+2. Launch app
+3. Search for a song
+4. Tap a song
+
+Result:
+
+App crashes/closes.
+
+User reopens app.
+
+User taps the same song again.
+
+Playback usually works.
+
+Sometimes it crashes a second time before eventually working.
+
+Observed characteristics:
+
+* Mostly affects first-time users
+* Mostly affects fresh installs
+* Mostly affects first playback attempt
+
+This strongly suggests:
+
+* Startup race condition
+* Initialization ordering issue
+* First-run state problem
+* Resource readiness issue
+
+Do not assume.
+
+Determine the actual cause.
+
+---
+
+# ISSUE 2 — AUTO-PLAY NEXT SONG FAILURE
+
+Real user feedback:
+
+"The song stops playing once the current song finishes. Doesn't continue to play the next song, even though it recommends another song. The next song is on pause and I have to open the app and press play every time."
+
+Expected behavior:
+
+When a song completes:
+
+* Recommendation should be generated
+* Queue should advance
+* Playback should continue automatically
+
+Actual behavior:
+
+* Recommendation appears
+* Next track exists
+* Playback remains paused
+* User must manually press Play
+
+Investigate:
+
+* ProcessingState.completed
+* playbackStateStream
+* sequenceStateStream
+* currentIndex
+* queue updates
+* recommendation insertion
+* AudioService queue synchronization
+* JustAudio queue synchronization
+* setAudioSource()
+* play() invocation
+
+Determine exactly where playback stops.
+
+---
+
+# ISSUE 3 — SKIP TRACK CRASH
+
+Real user feedback:
+
+"Whenever I try to skip a song the app exits itself. The pattern repeats every time I try to skip."
+
+Expected behavior:
+
+Skip Next should move to the next playable track.
+
+Actual behavior:
+
+App crashes/exits.
+
+Investigate:
+
+* skipToNext()
+* skipToPrevious()
+* queue boundaries
+* currentIndex validity
+* media item validity
+* recommendation queue interaction
+* AudioHandler state
+* PlaybackEngine state
+* setAudioSource() transitions
+
+Find the exact exception and stack trace.
+
+---
+
+# PHYSICAL DEVICE TEST PLAN
+
+For every test cycle:
+
+1. Uninstall existing app
+2. Clear all app data
+3. Install fresh APK
+4. Launch app
+5. Search for a song
+6. Tap song
+7. Observe playback
+8. Test Skip Next
+9. Test Skip Previous
+10. Let song complete naturally
+11. Observe recommendation behavior
+12. Record logs
+13. Save evidence
+
+Repeat multiple times.
+
+Do not stop after a single run.
+
+---
+
+# ADB REQUIREMENTS
+
+Use:
+
+```bash
+adb devices
+adb logcat
+adb shell
+adb install
+adb uninstall
+```
+
+Capture logs during:
+
+* App startup
+* First playback
+* Queue creation
+* URL resolution
+* Recommendation generation
+* Song completion
+* Skip actions
+* Crashes
+
+Focus on:
+
+* Flutter exceptions
+* Dart exceptions
+* AudioService
+* JustAudio
+* ExoPlayer
+* MediaSession
+* Hive
+* Notification services
+* Fatal exceptions
+* ANRs
+* IllegalStateException
+* NullPointerException
+* StateError
+* RangeError
+* Concurrent modification errors
+
+Do not stop until actual crash traces are found.
+
+---
+
+# STARTUP AUDIT
+
+Inspect:
+
+* main.dart
+
+Verify:
+
+* WidgetsFlutterBinding.ensureInitialized()
+* Hive initialization
+* Hive box opening
+* AudioHandler initialization
+* AudioService startup
+* Dependency injection ordering
+* Get.put ordering
+* Session restoration
+* Dynamic color initialization
+
+Determine:
+
+Can user interaction occur before startup completes?
+
+Identify all missing awaits.
+
+---
+
+# AUDIO STACK AUDIT
+
+Inspect:
+
+* audio_handler.dart
+* playback_engine.dart
+* player_controller.dart
+
+Investigate:
+
+* First playback request
+* Queue creation
+* MediaItem creation
+* setAudioSource()
+* customAction()
+* play()
+* pause()
+* stop()
+* skipToNext()
+* skipToPrevious()
+
+Determine:
+
+Can playback begin before:
+
+* AudioHandler ready
+* PlaybackEngine ready
+* AudioPlayer ready
+
+Trace every playback path.
+
+---
+
+# HIVE AUDIT
+
+Inspect:
+
+* AppPrefs
+* SongsUrlCache
+* LibraryBox
+* CacheBox
+
+Determine:
+
+Can playback access:
+
+* unopened boxes
+* partially initialized boxes
+* null values
+* invalid first-run state
+
+Audit all first-run code paths.
+
+---
+
+# STREAM RESOLUTION AUDIT
+
+Inspect:
+
+checkNGetUrl()
+
+Determine whether playback can fail because of:
+
+* cache initialization timing
+* URL resolution race conditions
+* null URLs
+* invalid StreamingData
+* async ordering issues
+* first-run networking state
+
+Trace all first-play code paths.
+
+---
+
+# QUEUE MANAGEMENT AUDIT
+
+Inspect:
+
+* queue creation
+* queue mutation
+* recommendation insertion
+* currentIndex
+* sequenceState
+* AudioService queue
+* JustAudio queue
+
+Determine:
+
+Can:
+
+* currentIndex become invalid
+* skip operations exceed queue bounds
+* queue synchronization fail
+* completion events leave playback paused
+
+Identify exact failure paths.
+
+---
+
+# INSTRUMENTATION
+
+Add temporary logging where needed.
+
+Log:
+
+* Startup started
+* Startup completed
+* Hive ready
+* AudioHandler ready
+* PlaybackEngine ready
+* Search completed
+* Song selected
+* URL resolution started
+* URL resolved
+* Queue updated
+* Audio source set
+* Playback started
+* Playback paused
+* Playback completed
+* Recommendation generated
+* Recommendation inserted
+* Skip requested
+* Skip completed
+
+Identify exactly where execution stops before failure.
+
+---
+
+# FIX REQUIREMENTS
+
+If root causes are identified:
+
+1. Implement fixes.
+2. Explain why each fix works.
+3. Rebuild app.
+4. Reinstall on the connected device.
+5. Retest all scenarios.
+6. Attempt to reproduce again.
+
+Do not mark fixes complete until verified through successful device testing.
+
+---
+
+# DELIVERABLES
+
+Provide a final report containing:
+
+## 1. First-Run Crash
+
+* Exact root cause
+* Reproduction steps
+* Relevant logs
+* Crash stack trace
+* Why first-time users are affected
+* Code changes
+* Verification results
+
+## 2. Auto-Play Failure
+
+* Exact root cause
+* Evidence
+* Relevant logs
+* Code changes
+* Verification results
+
+## 3. Skip Track Crash
+
+* Exact root cause
+* Crash stack trace
+* Evidence
+* Code changes
+* Verification results
+
+## 4. Runtime Evidence
+
+Include:
+
+* adb findings
+* logcat findings
+* instrumentation findings
+* screenshots if useful
+
+## 5. Final Verification
+
+Demonstrate:
+
+* Fresh-install playback works
+* First playback attempt succeeds
+* Skip Next works
+* Skip Previous works
+* Auto-play continues after completion
+* No crashes occur
+
+Do not provide assumptions.
+
+Prove every conclusion with runtime evidence, logs, stack traces, code references, and successful retesting on the connected physical Android device.

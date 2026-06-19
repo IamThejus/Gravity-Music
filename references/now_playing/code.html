@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Gravity Music - Now Playing</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface": "#e5e2e1",
+                        "on-error": "#690005",
+                        "tertiary-fixed": "#e5e2e1",
+                        "surface-container-lowest": "#0e0e0e",
+                        "primary": "#ffffff",
+                        "inverse-on-surface": "#313030",
+                        "on-surface-variant": "#c4c7c8",
+                        "on-tertiary": "#313030",
+                        "surface-variant": "#353434",
+                        "on-background": "#e5e2e1",
+                        "on-secondary-container": "#bab8b7",
+                        "surface-tint": "#c6c6c7",
+                        "primary-fixed": "#e2e2e2",
+                        "on-primary": "#2f3131",
+                        "on-tertiary-container": "#656464",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "tertiary-container": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "outline-variant": "#444748",
+                        "on-secondary-fixed-variant": "#474646",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-container-highest": "#353434",
+                        "inverse-primary": "#5d5f5f",
+                        "secondary": "#c9c6c5",
+                        "tertiary": "#ffffff",
+                        "surface-dim": "#141313",
+                        "surface-container-high": "#2a2a2a",
+                        "primary-fixed-dim": "#c6c6c7",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-primary-container": "#636565",
+                        "outline": "#8e9192",
+                        "on-primary-fixed": "#1a1c1c",
+                        "surface-bright": "#3a3939",
+                        "tertiary-fixed-dim": "#c8c6c5",
+                        "on-secondary": "#313030",
+                        "error": "#ffb4ab",
+                        "surface": "#141313",
+                        "secondary-fixed-dim": "#c9c6c5",
+                        "on-tertiary-fixed-variant": "#474746",
+                        "on-primary-fixed-variant": "#454747",
+                        "secondary-container": "#4a4949",
+                        "primary-container": "#e2e2e2",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-low": "#1c1b1b",
+                        "background": "#141313",
+                        "surface-container": "#201f1f",
+                        "on-tertiary-fixed": "#1c1b1b"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "screen-margin": "1.25rem",
+                        "stack-lg": "2.5rem",
+                        "gutter": "1rem",
+                        "stack-sm": "0.5rem",
+                        "stack-md": "1.5rem"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "display-hero": ["Inter"],
+                        "title-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["28px", { "lineHeight": "34px", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "display-hero": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "title-md": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Ambient Glow based on Album Art */
+        .ambient-bg {
+            background: radial-gradient(circle at 50% 30%, rgba(200, 80, 100, 0.4) 0%, rgba(50, 20, 30, 0.8) 50%, #141313 100%);
+        }
+        
+        /* Glassmorphism Utilities */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        
+        .glass-button {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .glass-button:active {
+            background: rgba(255, 255, 255, 0.16);
+            transform: scale(0.95);
+        }
+
+        /* Custom Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            background: #ffffff;
+            cursor: pointer;
+            margin-top: -4px;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+        .progress-fill {
+            position: absolute;
+            height: 4px;
+            background: #ffffff;
+            border-radius: 2px;
+            pointer-events: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface antialiased min-h-screen relative overflow-hidden flex flex-col items-center justify-center">
+<!-- Dynamic Ambient Background -->
+<div class="absolute inset-0 ambient-bg z-0 pointer-events-none"></div>
+<!-- Main Container - Suspended -->
+<div class="relative z-10 w-full max-w-md h-[839px] rounded-[2rem] overflow-hidden flex flex-col mx-screen-margin shadow-2xl glass-panel">
+<!-- Top App Bar (Minimal for Now Playing) -->
+<header class="flex justify-center items-center pt-8 pb-4 px-6 relative shrink-0">
+<div class="absolute w-12 h-1 bg-white/20 rounded-full top-4 left-1/2 -translate-x-1/2 cursor-pointer hover:bg-white/40 transition-colors"></div>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Now Playing</span>
+</header>
+<!-- Content Area -->
+<main class="flex-1 flex flex-col px-6 pb-8 overflow-y-auto hide-scrollbar">
+<!-- Artwork Container -->
+<div class="w-full aspect-square rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-8 relative shrink-0">
+<img alt="A high-fidelity album cover featuring a striking portrait of an artist against a vibrant, surreal landscape. The scene is dominated by deep reds, oranges, and contrasting cool blues, creating a cinematic and moody atmosphere. The artist is dressed in a stylish white outfit, exuding a confident and ethereal presence. Lighting is dramatic and high-contrast, enhancing the premium feel of the artwork." class="w-full h-full object-cover" data-alt="A high-fidelity album cover featuring a striking portrait of an artist against a vibrant, surreal landscape. The scene is dominated by deep reds, oranges, and contrasting cool blues, creating a cinematic and moody atmosphere. The artist is dressed in a stylish white outfit, exuding a confident and ethereal presence. Lighting is dramatic and high-contrast, enhancing the premium feel of the artwork." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOVRJTu4TzK7ETx1pkOUbg6gAMsSqCjKCK3tDPowsNRuqzkamKsMJ57u4QZwD61PbnyDNtY8u9E3WuA0w8NvJdm0PmF9j9A8g5CJ5veBaXvjaemWKZvRrizLWWQl2vQlcx8DjJtmopxx4A7hfh_EIBF2K6lJfFg1rvypffsAi9l1EXWhJFC9LiB8g7pNYUfUb7w7lgoBbaxVPJ8ZGBHdCeKXUmuycBXlvmfuk1l5hf6Zj0An3WjYmjeuRYraZJpXoA7vZAvAhFry4"/>
+<!-- Subtle Inner Glow -->
+<div class="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10 pointer-events-none"></div>
+</div>
+<!-- Track Info & Primary Actions -->
+<div class="flex justify-between items-start mb-6 shrink-0">
+<div class="flex flex-col">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary mb-1 line-clamp-1">All Of Me</h1>
+<h2 class="font-title-md text-title-md text-on-surface-variant line-clamp-1">Nao</h2>
+</div>
+<div class="flex gap-3">
+<button aria-label="Favorite" class="glass-button w-10 h-10 rounded-full flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">star</span>
+</button>
+<button aria-label="More options" class="glass-button w-10 h-10 rounded-full flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">more_horiz</span>
+</button>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="mb-8 shrink-0">
+<div class="relative w-full h-4 flex items-center group">
+<input class="z-10 absolute inset-0" id="progress-slider" max="100" min="0" type="range" value="35"/>
+<div class="progress-fill w-[35%]" id="progress-fill"></div>
+</div>
+<div class="flex justify-between mt-2">
+<span class="font-label-caps text-label-caps text-on-surface-variant">1:41</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-1 opacity-70">
+<span class="material-symbols-outlined text-[14px]">spatial_audio_off</span> Dolby Atmos
+                    </span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">-1:04</span>
+</div>
+</div>
+<!-- Main Controls -->
+<div class="flex items-center justify-between mb-8 px-2 shrink-0">
+<button aria-label="Shuffle" class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[24px]">shuffle</span>
+</button>
+<div class="flex items-center gap-6">
+<button aria-label="Previous" class="text-primary hover:scale-105 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[40px]" style="font-variation-settings: 'FILL' 1;">skip_previous</span>
+</button>
+<button aria-label="Play/Pause" class="w-20 h-20 bg-primary text-surface-container-lowest rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[48px]" style="font-variation-settings: 'FILL' 1;">pause</span>
+</button>
+<button aria-label="Next" class="text-primary hover:scale-105 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[40px]" style="font-variation-settings: 'FILL' 1;">skip_next</span>
+</button>
+</div>
+<button aria-label="Repeat" class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[24px]">repeat</span>
+</button>
+</div>
+<!-- Volume Control -->
+<div class="flex items-center gap-4 mb-8 shrink-0">
+<span class="material-symbols-outlined text-[20px] text-on-surface-variant">volume_down</span>
+<div class="relative flex-1 h-4 flex items-center">
+<input class="z-10 absolute inset-0" id="volume-slider" max="100" min="0" type="range" value="70"/>
+<div class="progress-fill w-[70%]" id="volume-fill"></div>
+</div>
+<span class="material-symbols-outlined text-[20px] text-on-surface-variant">volume_up</span>
+</div>
+<!-- Bottom Actions Bar -->
+<div class="flex justify-between items-center mt-auto pt-4 shrink-0">
+<button class="glass-button px-4 py-2 rounded-full flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-[20px]">lyrics</span>
+</button>
+<button class="glass-button px-4 py-2 rounded-full flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-[20px]">cast</span>
+</button>
+<button class="glass-button px-4 py-2 rounded-full flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-[20px]">queue_music</span>
+</button>
+</div>
+</main>
+</div>
+<script>
+        // Simple script to link slider visual fill with input value
+        const progressSlider = document.getElementById('progress-slider');
+        const progressFill = document.getElementById('progress-fill');
+        
+        progressSlider.addEventListener('input', function() {
+            progressFill.style.width = this.value + '%';
+        });
+
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeFill = document.getElementById('volume-fill');
+        
+        volumeSlider.addEventListener('input', function() {
+            volumeFill.style.width = this.value + '%';
+        });
+    </script>
+</body></html>

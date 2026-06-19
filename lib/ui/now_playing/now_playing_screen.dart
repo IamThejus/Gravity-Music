@@ -9,6 +9,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../controllers/download_controller.dart';
 import '../../controllers/lyrics_controller.dart';
@@ -565,6 +566,8 @@ class _LyricsOverlayState extends State<_LyricsOverlay> {
   final lyrics = Get.find<LyricsController>();
   final pc = Get.find<PlayerController>();
   late final Worker _posWorker;
+  late final Worker _activeWorker;
+  final ItemScrollController _itemScroll = ItemScrollController();
 
   @override
   void initState() {
@@ -574,11 +577,30 @@ class _LyricsOverlayState extends State<_LyricsOverlay> {
     _posWorker = ever(pc.progressBarState, (ProgressBarState s) {
       if (lyrics.isOpen.value) lyrics.updatePlaybackPosition(s.current);
     });
+    // Auto-centre the active line. ScrollablePositionedList scrolls by INDEX
+    // (alignment 0.42 ≈ centred), so it works for any line height and even
+    // when the target is off-screen (e.g. after a seek) — unlike the old
+    // fixed-pixel math.
+    _activeWorker = ever(lyrics.activeIndex, (int i) {
+      if (!lyrics.isOpen.value || !lyrics.hasSynced.value) return;
+      if (i < 0 || !_itemScroll.isAttached) return;
+      _itemScroll.scrollTo(
+        index: i,
+        alignment: 0.42,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   @override
   void dispose() {
     _posWorker.dispose();
+    _activeWorker.dispose();
+    // Leaving Now Playing (swipe-back / minimise to the mini-player pops this
+    // route) must not leave the lyrics tab "open" — otherwise it reappears the
+    // next time the screen is opened. Reset so lyrics only show on explicit tap.
+    lyrics.closeLyrics();
     super.dispose();
   }
 
@@ -617,8 +639,8 @@ class _LyricsOverlayState extends State<_LyricsOverlay> {
                       ),
                     );
                   }
-                  return ListView.builder(
-                    controller: lyrics.scrollController,
+                  return ScrollablePositionedList.builder(
+                    itemScrollController: _itemScroll,
                     padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.stackLg, vertical: 80),
                     itemCount: lyrics.parsedLyrics.length,

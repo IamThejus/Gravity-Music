@@ -125,6 +125,16 @@ class CacheService {
   /// Clears the mixes cache (forces next load to re-fetch).
   static void clearMixes() => _box.delete(_mixesKey);
 
+  // ── Personalized mixes (24h, like curated mixes) ──────────────────────────
+  static const _personalMixesKey = 'personalMixes';
+
+  static Map<String, dynamic>? getFreshPersonalMixes() =>
+      _read(_personalMixesKey, _mixesTtlMinutes);
+  static Map<String, dynamic>? getAnyPersonalMixes() =>
+      _readAny(_personalMixesKey);
+  static void savePersonalMixes(Map<String, dynamic> json) =>
+      _write(_personalMixesKey, json);
+
   // ── Utility ─────────────────────────────────────────────────────────────────
 
   /// Clears all cache entries.

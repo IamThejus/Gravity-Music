@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/player_controller.dart';
 import '../../services/library_service.dart';
 import '../../services/mixes_service.dart';
+import '../../services/personalized_mixes_service.dart';
 import '../../services/thumb_util.dart';
 import '../app_theme.dart';
 import '../library/library_screen.dart';
@@ -39,8 +40,14 @@ class HomeController extends GetxController {
   Future<void> loadMixes({bool forceRefresh = false}) async {
     loadingMixes.value = true;
     try {
-      mixes.assignAll(
-          await MixesService.getMixes(forceRefresh: forceRefresh));
+      // Personalized mixes first; fall back to curated mood mixes when the
+      // taste profile is too thin or personalization yields nothing.
+      var loaded = await PersonalizedMixesService.getMixes(
+          forceRefresh: forceRefresh);
+      if (loaded.isEmpty) {
+        loaded = await MixesService.getMixes(forceRefresh: forceRefresh);
+      }
+      mixes.assignAll(loaded);
     } finally {
       loadingMixes.value = false;
     }

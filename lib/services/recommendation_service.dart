@@ -9,7 +9,6 @@
 // Public surface is unchanged: `getRecommendations(videoId)` still returns a
 // RecommendedTrack list, so PlayerController.playWithRecommendations and the
 // AutoplayOrchestrator are untouched.
-import 'library_service.dart';
 import 'taste_profile.dart';
 import 'thumb_util.dart';
 import 'yt_music_service.dart';
@@ -33,8 +32,9 @@ List<RecommendedTrack> rerankByTaste(
     if (recentlyPlayedIds.contains(t.videoId)) key += freshnessPenalty;
     indexed.add((track: t, key: key));
   }
-  // Stable sort by key (Dart's List.sort is not stable, so include original
-  // index as tiebreaker via the key already encoding i).
+  // Dart's List.sort is NOT guaranteed stable, so the key already encodes the
+  // original index i as the tiebreaker — equal-affinity tracks keep their
+  // radio order without relying on sort stability.
   indexed.sort((a, b) => a.key.compareTo(b.key));
   return indexed.map((e) => e.track).toList();
 }
@@ -108,10 +108,7 @@ class RecommendationService {
 
       // Personalize: reorder by the user's taste (no-op on cold start).
       final profile = TasteProfile.current();
-      final recentIds = profile.isEmpty
-          ? const <String>{}
-          : LibraryService.getLiked().map((t) => t.videoId).toSet();
-      final ranked = rerankByTaste(tracks, profile, recentIds);
+      final ranked = rerankByTaste(tracks, profile, recentlyPlayedVideoIds());
 
       _cache[videoId] = (tracks: ranked, ts: DateTime.now());
       return ranked;

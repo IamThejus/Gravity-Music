@@ -9,6 +9,15 @@ import 'package:get/get.dart';
 import '../controllers/player_controller.dart';
 import 'library_service.dart';
 
+/// Video IDs of recently-played tracks, for the recommendation freshness
+/// penalty. Empty when PlayerController isn't registered.
+Set<String> recentlyPlayedVideoIds() {
+  if (!Get.isRegistered<PlayerController>()) return const {};
+  return Get.find<PlayerController>().searchHistory
+      .map((t) => t.videoId)
+      .toSet();
+}
+
 /// Splits a (possibly multi-artist) field like "A, B & C" into trimmed names.
 List<String> splitArtists(String field) => field
     .split(RegExp(r'[,&]|\bfeat\.?\b|\bx\b', caseSensitive: false))

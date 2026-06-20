@@ -265,6 +265,9 @@
   .dl-version{ font-size:14px; color: var(--text-1); }
   .dl-version span{ color: var(--accent); font-weight:600; font-family:'Space Grotesk',sans-serif; }
   .dl-right{ position:relative; z-index:2; }
+  .dl-btns{ display:flex; flex-direction:column; gap:10px; }
+  .dl-btns .btn{ justify-content:center; padding:13px 28px; font-size:14px; }
+  @media (max-width: 560px){ .dl-btns{ flex-direction:column; width:100%; } }
 
   /* ---------- FOOTER ---------- */
   footer{ padding: 60px 0 140px; border-top:1px solid var(--glass-border-soft); margin-top:40px; }
@@ -298,7 +301,7 @@
       <li><a href="#privacy">Privacy</a></li>
       <li><a href="#download">Download</a></li>
     </ul>
-    <a class="nav-cta" href="https://github.com/IamThejus/Gravity-Music/releases/latest/download/gravity-music.apk">Get the app</a>
+    <a class="nav-cta js-dl-apk" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Get the app</a>
   </nav>
 </div>
 
@@ -309,11 +312,11 @@
       <h1 class="headline">Music,<br><span class="grad">without gravity.</span></h1>
       <p class="sub">A premium music experience powered by YouTube, with on-device personalization, offline downloads, and a glassmorphism UI designed for those who appreciate the weight of every beat.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="https://github.com/IamThejus/Gravity-Music/releases/latest/download/gravity-music.apk">Download Gravity</a>
+        <a class="btn btn-primary js-dl-apk" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Download Gravity</a>
         <a class="btn btn-ghost" href="https://github.com/IamThejus/Gravity-Music">View Source</a>
       </div>
       <div class="hero-meta">
-        <div><strong>v1.2.3</strong>Latest release</div>
+        <div><strong class="js-version">v1.2.3</strong>Latest release</div>
         <div><strong>0</strong>Accounts required</div>
         <div><strong>100%</strong>Open source</div>
       </div>
@@ -419,10 +422,14 @@
       <div class="dl-left">
         <div class="dl-tag">Get Gravity Music</div>
         <div class="dl-title">Gravity Music</div>
-        <div class="dl-version">Latest version <span>v1.2.3</span> · Android APK</div>
+        <div class="dl-version">Latest version <span class="js-version">v1.2.3</span></div>
       </div>
       <div class="dl-right">
-        <a class="btn btn-primary" href="https://github.com/IamThejus/Gravity-Music/releases/latest/download/gravity-music.apk">Download Gravity</a>
+        <div class="dl-btns">
+          <a class="btn btn-primary js-dl-apk" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Android APK</a>
+          <a class="btn btn-ghost js-dl-deb" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Linux .deb</a>
+          <a class="btn btn-ghost js-dl-rpm" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Linux .rpm</a>
+        </div>
       </div>
     </div>
   </div>
@@ -445,6 +452,23 @@
     entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
   },{ threshold:.15 });
   document.querySelectorAll('.reveal').forEach(el=> io.observe(el));
+
+  (async () => {
+    try {
+      const res = await fetch('https://api.github.com/repos/IamThejus/Gravity-Music/releases/latest');
+      if (!res.ok) return;
+      const data = await res.json();
+      const version = 'v' + data.tag_name.replace(/^v/, '');
+      const apk = data.assets.find(a => a.name.endsWith('.apk'));
+      const deb = data.assets.find(a => a.name.endsWith('.deb'));
+      const rpm = data.assets.find(a => a.name.endsWith('.rpm'));
+
+      document.querySelectorAll('.js-version').forEach(el => el.textContent = version);
+      if (apk) document.querySelectorAll('.js-dl-apk').forEach(el => el.href = apk.browser_download_url);
+      if (deb) document.querySelectorAll('.js-dl-deb').forEach(el => el.href = deb.browser_download_url);
+      if (rpm) document.querySelectorAll('.js-dl-rpm').forEach(el => el.href = rpm.browser_download_url);
+    } catch (_) {}
+  })();
 </script>
 
 </body>

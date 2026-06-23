@@ -99,6 +99,12 @@ class LocalPlaylist {
 class LibraryService {
   static Box get _box => Hive.box('LibraryBox');
 
+  /// Fired after any local mutation (like/unlike, playlist create/edit/delete).
+  /// SyncService subscribes to push changes to the cloud (debounced). Null when
+  /// cloud sync is off, so this stays a zero-cost no-op for offline users.
+  static void Function()? onChanged;
+  static void _notify() => onChanged?.call();
+
   // ── Liked Songs ──────────────────────────────────────────────────────────
 
   static List<LibraryTrack> getLiked() {
@@ -115,12 +121,21 @@ class LibraryService {
     if (!liked.any((t) => t.videoId == track.videoId)) {
       liked.insert(0, track); // newest first
       _box.put('liked', liked.map((t) => t.toMap()).toList());
+      _notify();
     }
   }
 
   static void unlike(String videoId) {
     final liked = getLiked()..removeWhere((t) => t.videoId == videoId);
     _box.put('liked', liked.map((t) => t.toMap()).toList());
+    _notify();
+  }
+
+  /// Overwrite the entire liked list (used by sync's merge-on-login). Does NOT
+  /// fire [onChanged] — the sync layer pushes explicitly after merging, so this
+  /// avoids a redundant push loop.
+  static void replaceLiked(List<LibraryTrack> tracks) {
+    _box.put('liked', tracks.map((t) => t.toMap()).toList());
   }
 
   static void toggleLike(LibraryTrack track) {
@@ -135,6 +150,13 @@ class LibraryService {
   }
 
   static void _savePlaylists(List<LocalPlaylist> playlists) {
+    _box.put('playlists', playlists.map((p) => p.toMap()).toList());
+    _notify();
+  }
+
+  /// Overwrite all playlists (used by sync's merge-on-login). Does NOT fire
+  /// [onChanged] (see [replaceLiked]).
+  static void replacePlaylists(List<LocalPlaylist> playlists) {
     _box.put('playlists', playlists.map((p) => p.toMap()).toList());
   }
 

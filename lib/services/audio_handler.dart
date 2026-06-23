@@ -820,8 +820,13 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         Hive.box('AppPrefs').put('shuffleMode', false);
         Get.find<PlayerController>().syncShuffleDisabled();
 
-        // Stop current playback and clear audio source list
-        await _engine.player.stop();
+        // Pause (NOT stop) before clearing the source. stop() releases the
+        // platform player and retains the last position; the subsequent
+        // play() then resumes the NEW track from the OLD track's position
+        // (or, if it overruns the shorter track, somewhere mid/ahead). pause()
+        // keeps the player alive so clear()+add() resets the timeline to 0 —
+        // the same pattern playByIndex/setSourceNPlay use without the bug.
+        await _engine.player.pause();
         await _engine.clearForReload();
 
         queue.add(items);
@@ -881,7 +886,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         Hive.box('AppPrefs').put('shuffleMode', false);
         Get.find<PlayerController>().syncShuffleDisabled();
 
-        await _engine.player.stop();
+        // pause() not stop() — see playAllFrom for why stop() bleeds the
+        // previous track's seek position into the new one.
+        await _engine.player.pause();
         await _engine.clearForReload();
 
         queue.add(shuffleItems);

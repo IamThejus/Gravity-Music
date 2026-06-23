@@ -8,6 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:audio_service_mpris/audio_service_mpris.dart';
 import 'services/app_paths.dart';
+import 'services/cloud/auth_service.dart';
+import 'services/cloud/sync_service.dart';
 import 'controllers/download_controller.dart';
 import 'controllers/import_controller.dart';
 import 'controllers/lyrics_controller.dart';
@@ -71,6 +73,11 @@ void main() async {
   await Hive.openBox('DownloadsBox');
   await Hive.openBox('ListeningHistory');
 
+  // ── Optional cloud sync (Supabase) ────────────────────────────────────────
+  // No-op until SupabaseConfig is filled in; the app stays fully offline and
+  // account-free otherwise. Never blocks playback startup.
+  await AuthService.init();
+
   // ── Register audio handler (same as HarmonyMusic) ─────────────────────────
   final audioHandler = await initAudioService();
 
@@ -91,6 +98,12 @@ void main() async {
   // Background playlist offline downloads (separate from the per-track
   // Downloads tab; drives the tile download badges).
   Get.put(PlaylistDownloadController());
+
+  // Optional cloud sync (liked songs + playlists). Only registered when
+  // Supabase is configured; otherwise the app stays fully offline.
+  if (cloudSyncConfigured) {
+    Get.put(SyncService());
+  }
 
 // Listen to song changes and auto-fetch lyrics
 ever(Get.find<PlayerController>().currentSong, (song) {

@@ -251,6 +251,65 @@ class _TopBar extends StatelessWidget {
     );
   }
 
+  void _showQualitySheet(BuildContext context) {
+    final pc = Get.find<PlayerController>();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => GlassContainer(
+        radius: AppRadius.xl,
+        fill: AppColors.card.withOpacity(0.7),
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),
+        child: Obx(() {
+          final options = pc.currentQualityOptions();
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SheetHandle(),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Streaming quality',
+                      style: AppText.title(size: 16)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (options.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Only one quality is available for this track.',
+                        style: AppText.subtitle()),
+                  ),
+                )
+              else
+                ...options.map((opt) => ListTile(
+                      leading: Icon(
+                        opt.selected
+                            ? Icons.radio_button_checked_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        color: opt.selected
+                            ? AppColors.accent
+                            : AppColors.textSecondaryHi,
+                      ),
+                      title: Text(opt.label, style: AppText.title(size: 15)),
+                      trailing:
+                          Text(opt.detail, style: AppText.subtitle()),
+                      onTap: () {
+                        if (!opt.selected) pc.setQuality(opt.pref);
+                        Navigator.pop(context);
+                      },
+                    )),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
   void _showMoreSheet(BuildContext context) {
     final pc = Get.find<PlayerController>();
     showModalBottomSheet(
@@ -327,9 +386,12 @@ class _TopBar extends StatelessWidget {
               leading: const Icon(Icons.high_quality_rounded, color: Colors.white),
               title: Text('Streaming quality', style: AppText.title(size: 15)),
               trailing: Obx(() => Text(
-                  pc.isHighQuality.value ? 'High' : 'Data saver',
+                  pc.currentQualityLabel(),
                   style: AppText.subtitle())),
-              onTap: pc.toggleQuality,
+              onTap: () {
+                Navigator.pop(context);
+                _showQualitySheet(context);
+              },
             ),
             ListTile(
               leading: const Icon(Icons.timer_outlined, color: Colors.white),

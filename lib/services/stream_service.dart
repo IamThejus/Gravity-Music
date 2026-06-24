@@ -66,26 +66,40 @@ class StreamProvider {
     }
   }
 
-  // ── Quality selectors (mirrors HarmonyMusic exactly) ──────────────────────
+  // ── Quality ranking ───────────────────────────────────────────────────────
 
-  /// Best overall: prefer Opus 160kbps (251) or AAC 128kbps (140)
-  Audio? get highestQualityAudio => audioFormats?.lastWhere(
-        (a) => a.itag == 251 || a.itag == 140,
-        orElse: () => audioFormats!.first,
-      );
+  /// All audio formats, deduped to one entry per (codec, kbps) tier and sorted
+  /// by bitrate descending — index 0 is the best stream. At equal bitrates Opus
+  /// wins (160kbps Opus is perceptually better than 128kbps AAC). YouTube often
+  /// returns duplicate/DRC variants at the same bitrate; collapsing them keeps
+  /// the user-facing quality list clean.
+  List<Audio> get rankedFormats {
+    final list = audioFormats;
+    if (list == null || list.isEmpty) return const [];
+    final seen = <String>{};
+    final unique = <Audio>[];
+    for (final a in list) {
+      final key = '${a.audioCodec}_${(a.bitrate / 1000).round()}';
+      if (seen.add(key)) unique.add(a);
+    }
+    unique.sort((a, b) {
+      final cmp = b.bitrate.compareTo(a.bitrate);
+      if (cmp != 0) return cmp;
+      // Same bitrate: Opus > AAC
+      if (a.audioCodec == Codec.opus && b.audioCodec != Codec.opus) return -1;
+      if (b.audioCodec == Codec.opus && a.audioCodec != Codec.opus) return 1;
+      return 0;
+    });
+    return unique;
+  }
 
-  /// Lowest data usage: Opus 70kbps (249) or AAC 48kbps (139)
-  Audio? get lowQualityAudio => audioFormats?.lastWhere(
-        (a) => a.itag == 249 || a.itag == 139,
-        orElse: () => audioFormats!.first,
-      );
-
-  /// Serialised form used for Hive caching & Isolate return value
+  /// Serialised form used for Hive caching & Isolate return value. Stores the
+  /// full ranked format list so the player can offer a per-track quality picker
+  /// and pick any tier on demand (not just a pre-baked low/high pair).
   Map<String, dynamic> get hmStreamingData => {
         'playable': playable,
         'statusMSG': statusMSG,
-        'lowQualityAudio': lowQualityAudio?.toJson(),
-        'highQualityAudio': highestQualityAudio?.toJson(),
+        'formats': rankedFormats.map((a) => a.toJson()).toList(),
       };
 }
 

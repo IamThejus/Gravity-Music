@@ -6,6 +6,7 @@ import 'package:hive/hive.dart';
 import '../services/autoplay_orchestrator.dart';
 import '../services/library_service.dart';
 import '../services/listening_history_service.dart';
+import '../services/quality_prefs.dart';
 import '../services/recommendation_service.dart';
 import '../services/thumb_util.dart';
 
@@ -36,7 +37,9 @@ class PlayerController extends GetxController {
   final errorMessage       = RxnString();
   final isLoopEnabled      = false.obs;
   final isShuffleEnabled   = false.obs;
-  final isHighQuality      = true.obs;
+  /// Normalized streaming-quality preference (1.0 = highest … 0.0 = data
+  /// saver). Mapped onto each track's available formats at playback time.
+  final qualityPref        = 1.0.obs;
   final cacheSongs         = false.obs;
   final isCurrentSongLiked = false.obs;
   final searchHistory      = <LibraryTrack>[].obs;
@@ -86,8 +89,7 @@ class PlayerController extends GetxController {
       );
     });
 
-    final q = Hive.box('AppPrefs').get('streamingQuality') ?? 1;
-    isHighQuality.value = q == 1;
+    qualityPref.value = readQualityPref();
     cacheSongs.value = Hive.box('AppPrefs').get('cacheSongs') ?? false;
 
     // Watermark-driven autoplay refill. Started AFTER the queue listeners
@@ -154,9 +156,30 @@ class PlayerController extends GetxController {
     isShuffleEnabled.value = false;
   }
 
-  void toggleQuality() {
-    isHighQuality.value = !isHighQuality.value;
-    Hive.box('AppPrefs').put('streamingQuality', isHighQuality.value ? 1 : 0);
+  /// Quality options for the currently-playing track, labelled by tier and
+  /// annotated with bitrate + codec. Empty when nothing is loaded or the song
+  /// hasn't resolved a stream yet (e.g. offline-only with no cached formats).
+  List<QualityOption> currentQualityOptions() {
+    final song = currentSong.value;
+    if (song == null) return const [];
+    return qualityOptionsFor(cachedFormatsFor(song.id), qualityPref.value);
+  }
+
+  /// Short label for the current selection, for the settings row trailing text.
+  String currentQualityLabel() {
+    for (final o in currentQualityOptions()) {
+      if (o.selected) return o.label;
+    }
+    final p = qualityPref.value;
+    return p >= 0.99 ? 'High' : (p <= 0.01 ? 'Data saver' : 'Medium');
+  }
+
+  /// Apply a new quality tier: persist it and reload the current track in place
+  /// (per the user's "apply immediately" choice) so the switch is audible now.
+  void setQuality(double pref) {
+    qualityPref.value = pref;
+    writeQualityPref(pref);
+    audioHandler.customAction('reloadCurrentQuality');
   }
 
   void toggleCacheSongs() {
@@ -165,6 +188,21 @@ class PlayerController extends GetxController {
   }
 
   void clearQueue() => audioHandler.customAction('clearQueue');
+
+  /// Dismiss the player: stops playback and clears the whole session so the
+  /// mini-player disappears (the user swiped it away to reclaim screen space).
+  /// Playback resumes only when they start something new. Also drops the saved
+  /// session and any sleep timer so nothing restores it later.
+  void dismissPlayer() {
+    // Hide the mini-player this frame (the MiniPlayer's AnimatedSwitcher then
+    // animates it out). The audio_handler action below also emits a null
+    // mediaItem, which re-sets this to null — idempotent.
+    currentSong.value = null;
+    _sleepTimer?.cancel();
+    sleepTimerEnd.value = null;
+    audioHandler.customAction('dismissPlayer');
+    Hive.box('AppPrefs').delete('session');
+  }
 
   // ── Volume ────────────────────────────────────────────────────────────────
 

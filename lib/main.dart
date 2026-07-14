@@ -8,6 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:audio_service_mpris/audio_service_mpris.dart';
 import 'services/app_paths.dart';
+import 'services/cloud/auth_service.dart';
+import 'services/cloud/sync_service.dart';
 import 'controllers/download_controller.dart';
 import 'controllers/import_controller.dart';
 import 'controllers/lyrics_controller.dart';
@@ -64,12 +66,16 @@ void main() async {
   // platform-correct base dir instead — on mobile this is the documents dir,
   // identical to initFlutter()'s behaviour.
   Hive.init((await appDataDirectory()).path);
-  await Hive.openBox('AppPrefs');
-  await Hive.openBox('SongsUrlCache');
-  await Hive.openBox('LibraryBox');
-  await Hive.openBox('CacheBox');
-  await Hive.openBox('DownloadsBox');
-  await Hive.openBox('ListeningHistory');
+  // Open boxes in parallel — they're independent, so awaiting them one at a
+  // time just serialises disk IO on the cold-start critical path.
+  await Future.wait([
+    Hive.openBox('AppPrefs'),
+    Hive.openBox('SongsUrlCache'),
+    Hive.openBox('LibraryBox'),
+    Hive.openBox('CacheBox'),
+    Hive.openBox('DownloadsBox'),
+    Hive.openBox('ListeningHistory'),
+  ]);
 
   // ── Register audio handler (same as HarmonyMusic) ─────────────────────────
   final audioHandler = await initAudioService();
@@ -106,12 +112,26 @@ ever(Get.find<PlayerController>().currentSong, (song) {
 
   runApp(const YTPlayerApp());
 
-  // One-time prompt (Android) to exempt the app from battery optimization,
-  // so Doze doesn't freeze the process / cut network and stall background
-  // playback while the screen is off. Runs after the first frame so the
-  // system dialog appears over a rendered UI.
+  // Post-first-frame startup work — everything here is kept OFF the cold-start
+  // critical path so the UI paints as soon as possible.
   WidgetsBinding.instance.addPostFrameCallback((_) {
+    // One-time prompt (Android) to exempt the app from battery optimization,
+    // so Doze doesn't freeze the process / cut network and stall background
+    // playback while the screen is off. The system dialog appears over a
+    // rendered UI.
     BatteryOptimization.maybePrompt();
+
+    // Optional cloud sync (Supabase). Initialised AFTER the first frame so the
+    // network/disk cost of Supabase.initialize() (including a possible token
+    // refresh for signed-in users) never delays cold start. The app is fully
+    // usable offline meanwhile. SyncService must be registered only AFTER init
+    // completes — it early-returns if Supabase isn't ready — and the Library
+    // account row already guards on Get.isRegistered<SyncService>().
+    if (cloudSyncConfigured) {
+      AuthService.init().then((_) {
+        if (!Get.isRegistered<SyncService>()) Get.put(SyncService());
+      });
+    }
   });
 }
 

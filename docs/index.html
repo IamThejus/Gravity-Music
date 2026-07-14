@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gravity Music — Music, without gravity.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#050507;
+    --bg-1:#08080c;
+    --glass-bg: rgba(255,255,255,0.055);
+    --glass-bg-strong: rgba(255,255,255,0.09);
+    --glass-border: rgba(255,255,255,0.12);
+    --glass-border-soft: rgba(255,255,255,0.07);
+    --text-0:#f3f3f6;
+    --text-1:#a0a0aa;
+    --text-2:#6b6b74;
+    --accent:#36e27a;
+    --accent-dim: rgba(54,226,122,0.18);
+    --grad-a:#ff5f6d; /* album warm */
+    --grad-b:#7b5cff; /* album cool */
+    --grad-c:#ffb648; /* album amber */
+    --radius-lg: 28px;
+    --radius-md: 20px;
+    --radius-sm: 14px;
+    --ease: cubic-bezier(.22,1,.36,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    background: var(--bg-0);
+    color: var(--text-0);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;
+    overflow-x:hidden;
+    position:relative;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background: var(--accent-dim); color:#fff; }
+
+  /* ambient backdrop */
+  .ambient{
+    position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
+    background: radial-gradient(circle at 50% 0%, #0c0c12 0%, var(--bg-0) 55%), var(--bg-0);
+  }
+  .blob{ position:absolute; border-radius:50%; filter: blur(110px); opacity:.38; will-change: transform; }
+  .blob.b1{ width:620px; height:620px; top:-220px; left:-160px; background: radial-gradient(circle, var(--grad-b), transparent 70%); animation: drift1 26s ease-in-out infinite; }
+  .blob.b2{ width:560px; height:560px; top:10%; right:-200px; background: radial-gradient(circle, var(--grad-a), transparent 70%); animation: drift2 32s ease-in-out infinite; }
+  .blob.b3{ width:520px; height:520px; bottom:-180px; left:18%; background: radial-gradient(circle, var(--grad-c), transparent 70%); opacity:.22; animation: drift3 38s ease-in-out infinite; }
+  .blob.b4{ width:480px; height:480px; bottom:6%; right:8%; background: radial-gradient(circle, var(--accent), transparent 72%); opacity:.16; animation: drift1 30s ease-in-out infinite reverse; }
+  @keyframes drift1{ 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(60px,40px) scale(1.08);} }
+  @keyframes drift2{ 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(-50px,60px) scale(1.05);} }
+  @keyframes drift3{ 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(40px,-50px) scale(1.1);} }
+
+  .noise{ position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.035; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  section, header, footer { position:relative; z-index:2; }
+
+  .wrap{ max-width:1180px; margin:0 auto; padding:0 28px; }
+
+  /* glass component */
+  .glass{
+    background: var(--glass-bg);
+    border:1px solid var(--glass-border);
+    backdrop-filter: blur(25px) saturate(140%);
+    -webkit-backdrop-filter: blur(25px) saturate(140%);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.08) inset, 0 18px 50px -20px rgba(0,0,0,.7);
+    position:relative;
+  }
+  .glass::before{
+    content:''; position:absolute; inset:0; border-radius:inherit; padding:1px;
+    background: linear-gradient(160deg, rgba(255,255,255,.18), rgba(255,255,255,0) 40%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    pointer-events:none;
+  }
+
+  /* ---------- NAV ---------- */
+  .nav-outer{ position:fixed; top:20px; left:0; right:0; z-index:50; display:flex; justify-content:center; }
+  nav.glass{
+    display:flex; align-items:center; gap:36px;
+    padding:12px 14px 12px 22px;
+    border-radius:999px;
+    background: rgba(8,8,12,0.55);
+  }
+  .brand{ display:flex; align-items:center; gap:9px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; letter-spacing:.2px; color:var(--text-0); margin-right:8px;}
+  .brand .dot{ width:9px; height:9px; border-radius:50%; background: var(--accent); box-shadow: 0 0 14px 3px var(--accent-dim); }
+  .nav-links{ display:flex; gap:28px; list-style:none; }
+  .nav-links a{ color: var(--text-1); text-decoration:none; font-size:13.5px; font-weight:500; transition: color .25s var(--ease); }
+  .nav-links a:hover{ color: var(--text-0); }
+  .nav-cta{
+    background: var(--accent); color:#06140b; border:none; font-weight:700; font-size:13px;
+    padding:9px 18px; border-radius:999px; cursor:pointer; text-decoration:none; white-space:nowrap;
+    box-shadow: 0 0 0 0 var(--accent-dim); transition: box-shadow .3s var(--ease), transform .25s var(--ease);
+  }
+  .nav-cta:hover{ box-shadow: 0 0 28px 2px var(--accent-dim); transform: translateY(-1px); }
+  .nav-toggle{ display:none; }
+
+  @media (max-width: 760px){
+    .nav-outer{ top:auto; bottom:18px; }
+    nav.glass{ gap:0; padding:10px; border-radius:999px; }
+    .brand{ display:none; }
+    .nav-links{ gap:4px; }
+    .nav-links a{ padding:9px 14px; border-radius:999px; font-size:12px; }
+    .nav-links a:hover{ background: rgba(255,255,255,.06); }
+    .nav-cta{ padding:10px 16px; font-size:12px; margin-left:4px;}
+  }
+
+  /* ---------- HERO ---------- */
+  .hero{ padding: 190px 0 120px; }
+  .hero-grid{ display:grid; grid-template-columns: 1.05fr .95fr; gap:40px; align-items:center; }
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:8px;
+    font-size:11.5px; font-weight:700; letter-spacing:2.4px; text-transform:uppercase;
+    color: var(--accent); margin-bottom:22px;
+  }
+  .eyebrow::before{ content:''; width:16px; height:1px; background:var(--accent); }
+  h1.headline{
+    font-family:'Space Grotesk',sans-serif;
+    font-size: clamp(48px, 6.4vw, 88px);
+    line-height: .98; font-weight:700; letter-spacing:-2.5px;
+    color: var(--text-0);
+  }
+  h1.headline .grad{
+    background: linear-gradient(100deg, #fff 10%, var(--text-1) 70%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .hero p.sub{
+    margin-top:26px; font-size:18px; line-height:1.6; color:var(--text-1); max-width:440px; font-weight:400;
+  }
+  .hero-actions{ display:flex; gap:14px; margin-top:38px; flex-wrap:wrap; }
+  .btn{
+    display:inline-flex; align-items:center; gap:9px; font-size:14.5px; font-weight:600;
+    padding:15px 26px; border-radius:999px; text-decoration:none; cursor:pointer; border:1px solid transparent;
+    transition: transform .3s var(--ease), box-shadow .3s var(--ease), background .3s var(--ease);
+  }
+  .btn-primary{ background: var(--accent); color:#06140b; box-shadow: 0 0 0 0 rgba(54,226,122,.0); }
+  .btn-primary:hover{ transform: translateY(-2px); box-shadow: 0 10px 40px -8px rgba(54,226,122,.55); }
+  .btn-ghost{ background: var(--glass-bg); border-color: var(--glass-border); color: var(--text-0); backdrop-filter: blur(20px); }
+  .btn-ghost:hover{ background: var(--glass-bg-strong); transform: translateY(-2px); }
+
+  .hero-meta{ display:flex; gap:26px; margin-top:46px; }
+  .hero-meta div{ font-size:12px; color:var(--text-2); }
+  .hero-meta strong{ display:block; font-size:20px; color:var(--text-0); font-weight:700; font-family:'Space Grotesk',sans-serif; }
+
+  /* hero visual */
+  .hero-visual{ position:relative; height: 620px; }
+  .phone-frame{
+    position:absolute; border-radius:34px; overflow:hidden;
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.14);
+    background:#000;
+  }
+  .phone-frame img{ display:block; width:100%; height:100%; object-fit:cover; }
+  .pf-back{
+    width: 250px; height: 520px; left: -6px; top: 46px;
+    transform: rotate(-13deg) scale(.94);
+    opacity:.55; filter: saturate(.8) brightness(.7);
+    animation: floatA 9s ease-in-out infinite;
+  }
+  .pf-front{
+    width: 270px; height: 560px; left: 130px; top: 28px;
+    transform: rotate(4deg);
+    animation: floatB 7.5s ease-in-out infinite;
+    z-index:3;
+  }
+  .pf-side{
+    width: 240px; height: 500px; right: -28px; top: 70px;
+    transform: rotate(14deg) scale(.9);
+    opacity:.5; filter: saturate(.8) brightness(.7);
+    animation: floatC 10s ease-in-out infinite;
+  }
+  @keyframes floatA{ 0%,100%{ transform: rotate(-13deg) translateY(0px) scale(.94);} 50%{ transform: rotate(-15deg) translateY(-14px) scale(.94);} }
+  @keyframes floatB{ 0%,100%{ transform: rotate(4deg) translateY(0px);} 50%{ transform: rotate(2deg) translateY(-18px);} }
+  @keyframes floatC{ 0%,100%{ transform: rotate(14deg) translateY(0px) scale(.9);} 50%{ transform: rotate(16deg) translateY(-12px) scale(.9);} }
+
+  .visual-glow{
+    position:absolute; width:420px; height:420px; left:50%; top:50%;
+    background: radial-gradient(circle, var(--accent-dim), transparent 70%);
+    transform: translate(-50%,-50%); filter: blur(50px); z-index:0; opacity:.7;
+  }
+
+  @media (max-width: 980px){
+    .hero-grid{ grid-template-columns:1fr; }
+    .hero{ padding-top:150px; }
+    .hero p.sub{ max-width:none; }
+    .hero-visual{ height: 480px; margin-top:30px; }
+    .pf-front{ width:210px; height:436px; left: 90px; top:18px; }
+    .pf-back{ width:190px; height:396px; left:-10px; top:50px; }
+    .pf-side{ width:190px; height:396px; right:-10px; top:60px; }
+  }
+
+  /* ---------- SECTION HEADERS ---------- */
+  .section{ padding: 110px 0; }
+  .sec-head{ max-width:620px; margin-bottom:56px; }
+  .sec-eyebrow{ font-size:11.5px; font-weight:700; letter-spacing:2.4px; text-transform:uppercase; color:var(--text-2); margin-bottom:16px; }
+  .sec-title{ font-family:'Space Grotesk',sans-serif; font-size: clamp(32px,4vw,46px); font-weight:700; letter-spacing:-1.4px; line-height:1.08; }
+  .sec-title em{ font-style:normal; color: var(--text-1); }
+  .sec-sub{ margin-top:18px; font-size:16px; color:var(--text-1); line-height:1.65; }
+
+  /* fade-in on scroll */
+  .reveal{ opacity:0; transform: translateY(28px); transition: opacity .8s var(--ease), transform .8s var(--ease); }
+  .reveal.in{ opacity:1; transform: translateY(0); }
+
+  /* ---------- FEATURE TILES ---------- */
+  .tile-grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap:18px; }
+  .tile{
+    padding:30px 26px; transition: transform .4s var(--ease), border-color .4s var(--ease), background .4s var(--ease);
+  }
+  .tile:hover{ transform: translateY(-6px); border-color: rgba(255,255,255,.22); background: var(--glass-bg-strong); }
+  .tile .icon{
+    width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center;
+    font-size:21px; margin-bottom:20px;
+    background: linear-gradient(150deg, rgba(255,255,255,.14), rgba(255,255,255,.02));
+    border:1px solid var(--glass-border-soft);
+  }
+  .tile h3{ font-size:17px; font-weight:600; margin-bottom:9px; letter-spacing:-.2px; }
+  .tile p{ font-size:14px; color: var(--text-1); line-height:1.6; }
+  .tile.big{ grid-column: span 2; }
+
+  @media (max-width: 860px){
+    .tile-grid{ grid-template-columns: 1fr 1fr; }
+    .tile.big{ grid-column: span 2; }
+  }
+  @media (max-width: 560px){
+    .tile-grid{ grid-template-columns: 1fr; }
+    .tile.big{ grid-column: span 1; }
+  }
+
+  /* ---------- SHOWCASE (library screenshots) ---------- */
+  .showcase{ display:grid; grid-template-columns: 1fr 1fr; gap:22px; align-items:stretch; }
+  .showcase .glass{ padding:18px; }
+  .showcase img{ width:100%; border-radius:18px; display:block; border:1px solid var(--glass-border-soft); }
+  .showcase-copy{ display:flex; flex-direction:column; justify-content:center; padding:10px 8px; }
+  .showcase-copy h3{ font-family:'Space Grotesk',sans-serif; font-size:26px; font-weight:600; letter-spacing:-.6px; margin-bottom:14px; }
+  .showcase-copy p{ color:var(--text-1); font-size:15px; line-height:1.7; }
+  @media (max-width: 860px){ .showcase{ grid-template-columns:1fr; } .showcase-copy{ order:-1; } }
+
+  /* ---------- DESKTOP ---------- */
+  .desktop-grid{ display:grid; grid-template-columns:1fr; gap:18px; }
+  .desktop-shot{ border-radius: var(--radius-lg); overflow:hidden; border:1px solid var(--glass-border-soft); }
+  .desktop-shot img{ display:block; width:100%; height:auto; }
+  .desktop-shot .ds-label{ padding:14px 20px; font-size:13px; color:var(--text-2); font-weight:500; background: var(--glass-bg); border-top:1px solid var(--glass-border-soft); }
+
+  /* ---------- CONTRIBUTORS ---------- */
+  .contrib-grid{ display:flex; flex-wrap:wrap; gap:16px; }
+  .contrib-card{
+    display:flex; align-items:center; gap:12px; padding:14px 18px;
+    text-decoration:none; transition: transform .3s var(--ease), border-color .3s var(--ease);
+  }
+  .contrib-card:hover{ transform: translateY(-4px); border-color: rgba(255,255,255,.22); }
+  .contrib-card img{ width:44px; height:44px; border-radius:50%; border:1px solid var(--glass-border); flex-shrink:0; }
+  .contrib-name{ font-size:14px; font-weight:600; color:var(--text-0); }
+  .contrib-meta{ font-size:12px; color:var(--text-2); margin-top:2px; }
+
+  /* ---------- PRIVACY ---------- */
+  .privacy-grid{ display:grid; grid-template-columns: repeat(3,1fr); gap:18px; }
+  .privacy-tile{ padding:34px 28px; text-align:left; }
+  .privacy-tile .mark{ font-size:24px; margin-bottom:18px; display:block; }
+  .privacy-tile h3{ font-size:16.5px; font-weight:600; margin-bottom:10px; }
+  .privacy-tile p{ font-size:13.5px; color:var(--text-1); line-height:1.6; }
+  @media (max-width: 760px){ .privacy-grid{ grid-template-columns:1fr; } }
+
+  /* ---------- DOWNLOAD ---------- */
+  .download-panel{
+    padding: 64px 56px; display:flex; align-items:center; justify-content:space-between; gap:40px; flex-wrap:wrap;
+    background: radial-gradient(circle at 15% 20%, rgba(54,226,122,.08), transparent 55%), var(--glass-bg);
+    overflow:hidden; position:relative;
+  }
+  .download-panel::after{
+    content:''; position:absolute; width:340px; height:340px; right:-120px; bottom:-160px; border-radius:50%;
+    background: radial-gradient(circle, var(--accent-dim), transparent 70%); filter: blur(20px);
+  }
+  .dl-left{ position:relative; z-index:2; }
+  .dl-tag{ font-size:11.5px; letter-spacing:2px; text-transform:uppercase; color: var(--text-2); margin-bottom:14px; font-weight:700;}
+  .dl-title{ font-family:'Space Grotesk',sans-serif; font-size: clamp(30px,3.6vw,42px); font-weight:700; letter-spacing:-1.2px; margin-bottom:10px;}
+  .dl-version{ font-size:14px; color: var(--text-1); }
+  .dl-version span{ color: var(--accent); font-weight:600; font-family:'Space Grotesk',sans-serif; }
+  .dl-right{ position:relative; z-index:2; }
+  .dl-btns{ display:flex; flex-direction:column; gap:10px; }
+  .dl-btns .btn{ justify-content:center; padding:13px 28px; font-size:14px; }
+  @media (max-width: 560px){ .dl-btns{ flex-direction:column; width:100%; } }
+
+  /* ---------- FOOTER ---------- */
+  footer{ padding: 60px 0 140px; border-top:1px solid var(--glass-border-soft); margin-top:40px; }
+  .foot-row{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:18px; }
+  .foot-brand{ display:flex; align-items:center; gap:9px; font-family:'Space Grotesk',sans-serif; font-weight:600; }
+  .foot-brand .dot{ width:8px; height:8px; border-radius:50%; background:var(--accent); }
+  .foot-links{ display:flex; gap:24px; list-style:none; }
+  .foot-links a{ color: var(--text-1); text-decoration:none; font-size:13px; }
+  .foot-links a:hover{ color: var(--text-0); }
+  .foot-copy{ color: var(--text-2); font-size:12.5px; }
+
+  @media (max-width: 760px){ footer{ padding-bottom:120px; } }
+</style>
+</head>
+<body>
+
+<div class="ambient">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+  <div class="blob b4"></div>
+</div>
+<div class="noise"></div>
+
+<div class="nav-outer">
+  <nav class="glass">
+    <div class="brand"><span class="dot"></span>Gravity</div>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#library">Library</a></li>
+      <li><a href="#desktop">Desktop</a></li>
+      <li><a href="#android-auto">Android Auto</a></li>
+      <li><a href="#download">Download</a></li>
+    </ul>
+    <a class="nav-cta js-dl-apk" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Get the app</a>
+  </nav>
+</div>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy reveal in">
+      <div class="eyebrow">Gravity Music · Android &amp; Desktop</div>
+      <h1 class="headline">Music,<br><span class="grad">without gravity.</span></h1>
+      <p class="sub">A premium music experience powered by YouTube, with on-device personalization, offline downloads, and a glassmorphism UI designed for those who appreciate the weight of every beat.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary js-dl-apk" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Download Gravity</a>
+        <a class="btn btn-ghost" href="https://github.com/IamThejus/Gravity-Music">View Source</a>
+      </div>
+      <div class="hero-meta">
+        <div><strong class="js-version">v1.2.3</strong>Latest release</div>
+        <div><strong>0</strong>Accounts required</div>
+        <div><strong>100%</strong>Open source</div>
+      </div>
+    </div>
+    <div class="hero-visual reveal in">
+      <div class="visual-glow"></div>
+      <div class="phone-frame pf-back"><img src="library.webp" alt=""></div>
+      <div class="phone-frame pf-front"><img src="home.webp" alt="Gravity Music home screen"></div>
+      <div class="phone-frame pf-side"><img src="player.webp" alt=""></div>
+    </div>
+  </div>
+</header>
+
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">Features</div>
+      <h2 class="sec-title">Everything orbits <em>around your sound.</em></h2>
+      <p class="sec-sub">No clutter, no upsells — just the tools a serious listener actually reaches for.</p>
+    </div>
+    <div class="tile-grid">
+      <div class="tile glass reveal">
+        <div class="icon">🎧</div>
+        <h3>Background Playback</h3>
+        <p>Keep listening while you browse, message, or lock your screen. Gravity never lets go of the thread.</p>
+      </div>
+      <div class="tile glass reveal">
+        <div class="icon">🎨</div>
+        <h3>Dynamic Themes</h3>
+        <p>Every screen takes its color from the album art playing — your library becomes its own ambient light.</p>
+      </div>
+      <div class="tile glass reveal">
+        <div class="icon">⬇</div>
+        <h3>Offline Downloads</h3>
+        <p>Save tracks and playlists to your device. No connection, no interruption.</p>
+      </div>
+      <div class="tile glass big reveal">
+        <div class="icon">🧠</div>
+        <h3>Made For You</h3>
+        <p>On-device mixes built from your listening history — Artist Mixes, Discovery, Repeat Rewind, Throwback, and Your Favorites. No account, no cloud profile.</p>
+      </div>
+      <div class="tile glass reveal">
+        <div class="icon">📥</div>
+        <h3>Playlist Import</h3>
+        <p>Import from Spotify or Apple Music links. Your collection, matched to YouTube — no rebuild from scratch.</p>
+      </div>
+      <div class="tile glass reveal">
+        <div class="icon">🎵</div>
+        <h3>Synced Lyrics</h3>
+        <p>Word-by-word lyrics that scroll with the music, auto-fetched the moment a track starts.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="library">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">Library</div>
+      <h2 class="sec-title">A library that <em>feels like yours.</em></h2>
+    </div>
+    <div class="showcase">
+      <div class="glass reveal">
+        <img src="library.webp" alt="Gravity Music library screen with liked songs, downloads and playlists">
+      </div>
+      <div class="showcase-copy reveal">
+        <h3>Liked songs, downloads, playlists — one place.</h3>
+        <p>Everything you've collected lives together: liked tracks, offline saves, and every playlist you've made or imported. Nothing buried, nothing locked behind tabs you don't need.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="desktop">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">Desktop</div>
+      <h2 class="sec-title">Linux &amp; Windows, <em>natively.</em></h2>
+      <p class="sec-sub">Full media key support, MPRIS system integration, and the same glassmorphism UI — running natively on Linux and Windows via libmpv.</p>
+    </div>
+    <div class="desktop-grid reveal">
+      <div class="desktop-shot glass">
+        <img src="desktop-app.webp" alt="Gravity Music running on Gnome (Linux)">
+        <div class="ds-label">Gravity Music on GNOME / Wayland</div>
+      </div>
+      <div class="desktop-shot glass">
+        <img src="desktop-playbar.webp" alt="Gravity Music MPRIS system media integration">
+        <div class="ds-label">System media controls via MPRIS</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="android-auto">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">Android Auto</div>
+      <h2 class="sec-title">Your music,<em> on the road.</em></h2>
+      <p class="sec-sub">Browse playlists, control playback, and see what's playing — all from your car's display without touching your phone.</p>
+    </div>
+    <div class="desktop-grid reveal">
+      <div class="desktop-shot glass">
+        <img src="auto-incar.webp" alt="Gravity Music on Android Auto in-car display">
+        <div class="ds-label">In-car display</div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+        <div class="desktop-shot glass">
+          <img src="auto-playlists.webp" alt="Gravity Music Android Auto playlists">
+          <div class="ds-label">Browse playlists</div>
+        </div>
+        <div class="desktop-shot glass">
+          <img src="auto-mapview.webp" alt="Gravity Music Android Auto map view">
+          <div class="ds-label">Map view</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="contributors">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">Contributors</div>
+      <h2 class="sec-title">Built in <em>the open.</em></h2>
+      <p class="sec-sub">Gravity Music is open source. Everyone who has contributed to the codebase.</p>
+    </div>
+    <div class="contrib-grid reveal" id="contrib-list">
+      <!-- populated by JS -->
+    </div>
+  </div>
+</section>
+
+<section class="section" id="privacy">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">Privacy</div>
+      <h2 class="sec-title">Your music.<br>Your device.<br><em>Your privacy.</em></h2>
+    </div>
+    <div class="privacy-grid">
+      <div class="privacy-tile glass reveal">
+        <span class="mark">🔒</span>
+        <h3>No Account Required</h3>
+        <p>No forced login. No user profiles. Open the app and start listening.</p>
+      </div>
+      <div class="privacy-tile glass reveal">
+        <span class="mark">🛡</span>
+        <h3>No External Servers</h3>
+        <p>Search, recommendations, and mixes run entirely on your device. No data leaves your phone.</p>
+      </div>
+      <div class="privacy-tile glass reveal">
+        <span class="mark">⚡</span>
+        <h3>Open Source</h3>
+        <p>Transparent and community-driven, line by line, on GitHub.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="download">
+  <div class="wrap">
+    <div class="download-panel glass reveal">
+      <div class="dl-left">
+        <div class="dl-tag">Get Gravity Music</div>
+        <div class="dl-title">Gravity Music</div>
+        <div class="dl-version">Latest version <span class="js-version">v1.2.3</span></div>
+      </div>
+      <div class="dl-right">
+        <div class="dl-btns">
+          <a class="btn btn-primary js-dl-apk" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Android APK</a>
+          <a class="btn btn-ghost js-dl-deb" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Linux .deb</a>
+          <a class="btn btn-ghost js-dl-rpm" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Linux .rpm</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-row">
+    <div class="foot-brand"><span class="dot"></span>Gravity Music</div>
+    <ul class="foot-links">
+      <li><a href="https://github.com/IamThejus/Gravity-Music">GitHub</a></li>
+      <li><a href="#privacy">Privacy</a></li>
+      <li><a href="#download">Download</a></li>
+    </ul>
+    <div class="foot-copy">Built in the open · IamThejus</div>
+  </div>
+</footer>
+
+<script>
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+  },{ threshold:.15 });
+  document.querySelectorAll('.reveal').forEach(el=> io.observe(el));
+
+  (async () => {
+    try {
+      const res = await fetch('https://api.github.com/repos/IamThejus/Gravity-Music/releases/latest');
+      if (!res.ok) return;
+      const data = await res.json();
+      const version = 'v' + data.tag_name.replace(/^v/, '');
+      const apk = data.assets.find(a => a.name.endsWith('.apk'));
+      const deb = data.assets.find(a => a.name.endsWith('.deb'));
+      const rpm = data.assets.find(a => a.name.endsWith('.rpm'));
+
+      document.querySelectorAll('.js-version').forEach(el => el.textContent = version);
+      if (apk) document.querySelectorAll('.js-dl-apk').forEach(el => el.href = apk.browser_download_url);
+      if (deb) document.querySelectorAll('.js-dl-deb').forEach(el => el.href = deb.browser_download_url);
+      if (rpm) document.querySelectorAll('.js-dl-rpm').forEach(el => el.href = rpm.browser_download_url);
+    } catch (_) {}
+  })();
+
+  (async () => {
+    try {
+      const res = await fetch('https://api.github.com/repos/IamThejus/Gravity-Music/contributors');
+      if (!res.ok) return;
+      const contributors = await res.json();
+      const list = document.getElementById('contrib-list');
+      list.innerHTML = contributors.map(c => `
+        <a class="contrib-card glass" href="${c.html_url}" target="_blank" rel="noopener">
+          <img src="${c.avatar_url}&s=88" alt="${c.login}">
+          <div>
+            <div class="contrib-name">${c.login}</div>
+            <div class="contrib-meta">${c.contributions} commit${c.contributions !== 1 ? 's' : ''}</div>
+          </div>
+        </a>
+      `).join('');
+    } catch (_) {}
+  })();
+</script>
+
+</body>
+</html>

@@ -12,6 +12,7 @@ import '../../controllers/download_controller.dart';
 import '../../controllers/import_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../controllers/playlist_download_controller.dart';
+import '../../services/cloud/sync_service.dart';
 import '../../services/library_service.dart';
 import '../../services/thumb_util.dart';
 import '../app_theme.dart';
@@ -109,6 +110,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 MaterialPageRoute(builder: (_) => const DownloadsScreen())),
           ),
         ),
+        // ── Cloud sync account (only when Supabase is configured) ────────
+        const SliverToBoxAdapter(child: _AccountRow()),
         // ── Playlists grid ──────────────────────────────────────────────
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(AppSpacing.screenMargin,
@@ -491,6 +494,140 @@ class _LibraryRow extends StatelessWidget {
   }
 }
 
+// ── Cloud sync account row ───────────────────────────────────────────────────
+
+/// Sign-in / account tile for optional cloud sync. Renders nothing unless
+/// Supabase is configured (SyncService registered). Signed out → "Sign in to
+/// sync"; signed in → email + live sync status, tap for Sync now / Sign out.
+class _AccountRow extends StatelessWidget {
+  const _AccountRow();
+
+  @override
+  Widget build(BuildContext context) {
+    if (!Get.isRegistered<SyncService>()) return const SizedBox.shrink();
+    final sync = SyncService.to;
+
+    return Obx(() {
+      final signedIn = sync.isSignedIn;
+      final status = sync.status.value;
+
+      final String title;
+      final String subtitle;
+      if (!signedIn) {
+        title = 'Sign in to sync';
+        subtitle = 'Back up liked songs & playlists';
+      } else {
+        title = sync.email ?? 'Signed in';
+        subtitle = switch (status) {
+          SyncStatus.syncing => 'Syncing…',
+          SyncStatus.error => 'Sync failed — tap to retry',
+          SyncStatus.idle => 'Synced',
+        };
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenMargin, vertical: 6),
+        child: GestureDetector(
+          onTap: () {
+            AppHaptics.light();
+            signedIn ? _showAccountSheet(context, sync) : _signIn(sync);
+          },
+          child: GlassContainer(
+            radius: AppRadius.lg,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Icon(
+                    signedIn ? Icons.cloud_done_rounded : Icons.cloud_rounded,
+                    color: AppColors.accent,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: AppText.title(size: 16),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      Text(subtitle, style: AppText.subtitle(size: 13)),
+                    ],
+                  ),
+                ),
+                if (status == SyncStatus.syncing)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppColors.accent),
+                  )
+                else
+                  Icon(signedIn ? Icons.more_horiz_rounded : Icons.login_rounded,
+                      color: AppColors.textTertiary),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  Future<void> _signIn(SyncService sync) async {
+    try {
+      await sync.signIn();
+    } catch (e) {
+      Get.snackbar('Sign-in failed', e.toString(),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.card,
+          colorText: AppColors.white,
+          duration: const Duration(seconds: 3));
+    }
+  }
+
+  void _showAccountSheet(BuildContext context, SyncService sync) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.sync_rounded, color: AppColors.accent),
+              title: Text('Sync now', style: AppText.title(size: 15)),
+              onTap: () {
+                Navigator.pop(context);
+                sync.syncNow();
+              },
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.logout_rounded, color: AppColors.textSecondary),
+              title: Text('Sign out', style: AppText.title(size: 15)),
+              onTap: () {
+                Navigator.pop(context);
+                sync.signOut();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Liked Songs ────────────────────────────────────────────────────────────
 
 class LikedSongsScreen extends StatelessWidget {
@@ -592,7 +729,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
           SliverAppBar(
             backgroundColor: AppColors.canvas,
             pinned: true,
-            expandedHeight: 280,
+            expandedHeight: 300,
             leading: const AppBackButton(),
             actions: [
               _PlaylistDownloadAction(playlist: pl),
@@ -608,19 +745,25 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             flexibleSpace: FlexibleSpaceBar(
               background: Padding(
                 padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.screenMargin, 80, AppSpacing.screenMargin, 12),
+                    AppSpacing.screenMargin, 72, AppSpacing.screenMargin, 12),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     ArtImage(
                         url: sizedThumb(pl.thumbnailUrl, ThumbnailSize.card),
-                        size: 150,
+                        size: 140,
                         radius: AppRadius.lg),
                     const SizedBox(height: 12),
-                    Text(pl.name,
-                        style: AppText.heading(size: 24),
-                        textAlign: TextAlign.center),
+                    // Flexible + maxLines keeps long imported playlist names
+                    // (which can run 3+ lines) from overflowing the header.
+                    Flexible(
+                      child: Text(pl.name,
+                          style: AppText.heading(size: 24),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
+                    ),
                     Text('${pl.tracks.length} songs',
                         style: AppText.subtitle(size: 13)),
                   ],
@@ -780,14 +923,26 @@ class DownloadsScreen extends StatelessWidget {
                           title: t.title,
                           subtitle:
                               'Downloading… ${(p * 100).clamp(0, 100).toStringAsFixed(0)}%',
-                          trailing: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              value: p == 0 ? null : p,
-                              strokeWidth: 2.5,
-                              color: Colors.white,
-                            ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  value: p == 0 ? null : p,
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded,
+                                    color: AppColors.textTertiary),
+                                tooltip: 'Cancel download',
+                                onPressed: () =>
+                                    dc.cancelDownload(t.videoId),
+                              ),
+                            ],
                           ),
                           onTap: () {},
                         );

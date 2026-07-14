@@ -28,6 +28,7 @@ import '../services/download_service.dart';
 import '../services/playlist_download_service.dart';
 import '../services/library_service.dart';
 import '../services/playback_engine.dart';
+import '../services/quality_prefs.dart';
 import '../services/queue_manager.dart';
 import '../services/stream_service.dart';
 import '../services/thumb_util.dart';
@@ -389,7 +390,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       {bool generateNewUrl = false}) async {
     logD('url', 'checkNGetUrl($videoId) start');
     final urlCacheBox = Hive.box('SongsUrlCache');
-    final qualityIndex = Hive.box('AppPrefs').get('streamingQuality') ?? 1;
+    final qualityPref = readQualityPref();
 
     // 0. Offline download — highest priority. If the track is downloaded,
     //    play straight off disk and never touch the network.
@@ -398,15 +399,17 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       return HMStreamingData(
         playable: true,
         statusMSG: 'OK',
-        highQualityAudio: Audio(
-          itag: 140,
-          audioCodec: Codec.mp4a,
-          bitrate: 0,
-          duration: 0,
-          loudnessDb: DownloadService.loudnessFor(videoId),
-          url: offlineUrl,
-          size: 0,
-        ),
+        formats: [
+          Audio(
+            itag: 140,
+            audioCodec: Codec.mp4a,
+            bitrate: 0,
+            duration: 0,
+            loudnessDb: DownloadService.loudnessFor(videoId),
+            url: offlineUrl,
+            size: 0,
+          ),
+        ],
       );
     }
 
@@ -417,24 +420,26 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       return HMStreamingData(
         playable: true,
         statusMSG: 'OK',
-        highQualityAudio: Audio(
-          itag: 140,
-          audioCodec: Codec.mp4a,
-          bitrate: 0,
-          duration: 0,
-          loudnessDb: PlaylistDownloadService.loudnessFor(videoId),
-          url: playlistOfflineUrl,
-          size: 0,
-        ),
+        formats: [
+          Audio(
+            itag: 140,
+            audioCodec: Codec.mp4a,
+            bitrate: 0,
+            duration: 0,
+            loudnessDb: PlaylistDownloadService.loudnessFor(videoId),
+            url: playlistOfflineUrl,
+            size: 0,
+          ),
+        ],
       );
     }
 
     // 1. Check if URL is cached and still valid
     if (urlCacheBox.containsKey(videoId) && !generateNewUrl) {
       final cached = urlCacheBox.get(videoId);
-      if (cached is Map && !_isUrlExpired(cached['lowQualityAudio']?['url'] ?? '')) {
+      if (cached is Map && !_isUrlExpired(_cachedUrl(cached))) {
         final data = HMStreamingData.fromJson(Map<String, dynamic>.from(cached));
-        data.setQualityIndex(qualityIndex);
+        data.setQualityPref(qualityPref);
         return data;
       }
     }
@@ -460,8 +465,20 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       urlCacheBox.put(videoId, json);
     }
 
-    data.setQualityIndex(qualityIndex);
+    data.setQualityPref(qualityPref);
     return data;
+  }
+
+  /// Pull any stream URL out of a cached entry to run the expiry check against.
+  /// Handles both the current `formats` list shape and the legacy low/high one.
+  String _cachedUrl(Map cached) {
+    final formats = cached['formats'];
+    if (formats is List && formats.isNotEmpty) {
+      return (formats.first as Map?)?['url'] ?? '';
+    }
+    return cached['highQualityAudio']?['url'] ??
+        cached['lowQualityAudio']?['url'] ??
+        '';
   }
 
   // ── Android Auto browsing ──────────────────────────────────────────────────
@@ -739,6 +756,30 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         _queueMgr.onClearedExceptCurrent(q.first.id);
         break;
 
+      // ── Dismiss the player entirely ─────────────────────────────────────
+      // Stops playback and tears the whole session down: empties the queue and
+      // nulls the current media item so the mini-player disappears and the
+      // screen reclaims the space. Playback resumes only when the user starts
+      // something new. (PlayerController also clears the saved session so this
+      // survives a restart.)
+      case 'dismissPlayer':
+        // pause() not stop() — see playAllFrom for why stop() bleeds the last
+        // position into the next track. clearForReload() empties the source so
+        // playback is silenced while the player stays alive (resetting the
+        // timeline to 0 when the user next plays something).
+        await _engine.player.pause();
+        await _engine.clearForReload();
+        _engine.setPhase(PlaybackPhase.idle, reason: 'dismissPlayer');
+        currentSongUrl = null;
+        currentIndex = 0;
+        queue.add([]);
+        mediaItem.add(null);
+        playbackState.add(playbackState.value.copyWith(
+          processingState: AudioProcessingState.idle,
+          playing: false,
+        ));
+        break;
+
       // ── Toggle loudness normalisation ───────────────────────────────────
       case 'toggleLoudnessNormalization':
         _engine.loudnessNormalizationEnabled = extras!['enable'] as bool;
@@ -758,6 +799,49 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       // ── Set volume (0–100) ──────────────────────────────────────────────
       case 'setVolume':
         _engine.player.setVolume((extras!['value'] as int) / 100);
+        break;
+
+      // ── Reload current track at the newly-selected quality ──────────────
+      // Re-resolves the current song's URL against the updated qualityPref and
+      // swaps the source in place, restoring playback position so the switch
+      // feels seamless. No-op when nothing is loaded.
+      case 'reloadCurrentQuality':
+        if (currentIndex < 0 || currentIndex >= queue.value.length) break;
+        final item = queue.value[currentIndex];
+        final reloadIndex = currentIndex;
+        final wasPlaying = _engine.player.playing;
+        final pos = _engine.player.position;
+
+        await _engine.player.pause();
+        await _engine.clearForReload();
+
+        // The disk cache (LockCachingAudioSource) is keyed by videoId only, so
+        // it holds bytes at the OLD quality. Drop it so the new tier is fetched
+        // and re-cached. Downloaded/offline files aren't cached this way.
+        try {
+          final cacheFile =
+              File('${_engine.getCacheDir()}/cachedSongs/${item.id}.mp3');
+          if (await cacheFile.exists()) await cacheFile.delete();
+        } catch (_) {}
+
+        final streamInfo =
+            await checkNGetUrl(item.id, generateNewUrl: true);
+
+        // Guard: user may have skipped while we were fetching.
+        if (reloadIndex != currentIndex) break;
+        if (!streamInfo.playable || streamInfo.audio == null) {
+          _engine.setPhase(PlaybackPhase.error,
+              reason: 'reloadCurrentQuality unplayable');
+          break;
+        }
+
+        currentSongUrl = item.extras!['url'] = streamInfo.audio!.url;
+        await _engine.loadCurrent(_engine.createSource(item));
+        await _engine.player.seek(pos);
+        if (_engine.loudnessNormalizationEnabled) {
+          _engine.normalizeVolume(streamInfo.audio!.loudnessDb);
+        }
+        if (wasPlaying) await _engine.player.play();
         break;
 
       // ── Restore saved session on app start ─────────────────────────────
@@ -820,8 +904,13 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         Hive.box('AppPrefs').put('shuffleMode', false);
         Get.find<PlayerController>().syncShuffleDisabled();
 
-        // Stop current playback and clear audio source list
-        await _engine.player.stop();
+        // Pause (NOT stop) before clearing the source. stop() releases the
+        // platform player and retains the last position; the subsequent
+        // play() then resumes the NEW track from the OLD track's position
+        // (or, if it overruns the shorter track, somewhere mid/ahead). pause()
+        // keeps the player alive so clear()+add() resets the timeline to 0 —
+        // the same pattern playByIndex/setSourceNPlay use without the bug.
+        await _engine.player.pause();
         await _engine.clearForReload();
 
         queue.add(items);
@@ -881,7 +970,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         Hive.box('AppPrefs').put('shuffleMode', false);
         Get.find<PlayerController>().syncShuffleDisabled();
 
-        await _engine.player.stop();
+        // pause() not stop() — see playAllFrom for why stop() bleeds the
+        // previous track's seek position into the new one.
+        await _engine.player.pause();
         await _engine.clearForReload();
 
         queue.add(shuffleItems);

@@ -1,7 +1,7 @@
 name: saragama
 description: A modern, minimal YouTube audio player.
 publish_to: 'none'
-version: 1.2.3
+version: 1.3.2
 
 environment:
   sdk: ">=3.1.5 <4.0.0"
@@ -44,6 +44,8 @@ dependencies:
   palette_generator: ^0.3.3   # dynamic accent color from album art
   share_plus: ^10.1.4         # native share sheet
   scrollable_positioned_list: ^0.3.8  # index-based auto-centering for synced lyrics
+  supabase_flutter: ^2.15.0
+  google_sign_in: ^7.2.0
 
 # Local patched copy of just_audio_media_kit: disables libmpv `cache-on-disk`
 # (media_kit hardcodes it on), which on some Linux setups fails to create the

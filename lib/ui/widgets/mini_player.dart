@@ -90,23 +90,90 @@ class MiniPlayer extends StatelessWidget {
   }
 }
 
-class _Bar extends StatelessWidget {
+class _Bar extends StatefulWidget {
   final PlayerController pc;
   final MediaItem song;
   const _Bar({required this.pc, required this.song});
 
   @override
+  State<_Bar> createState() => _BarState();
+}
+
+class _BarState extends State<_Bar> with SingleTickerProviderStateMixin {
+  // Live horizontal offset while the user swipes the bar right to dismiss it.
+  // A ValueNotifier (not setState) so each drag frame only repaints the
+  // Transform/Opacity layer — the glass bar underneath is built once and reused
+  // (setState here would re-blur the BackdropFilter ~60×/sec).
+  final ValueNotifier<double> _dragX = ValueNotifier(0);
+  late final AnimationController _slide = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 260));
+
+  @override
+  void dispose() {
+    _slide.dispose();
+    _dragX.dispose();
+    super.dispose();
+  }
+
+  void _onDragUpdate(DragUpdateDetails d) {
+    _dragX.value = (_dragX.value + d.delta.dx).clamp(0.0, double.infinity);
+  }
+
+  void _onDragEnd(DragEndDetails d) {
+    final width = context.size?.width ?? MediaQuery.sizeOf(context).width;
+    final velocity = d.primaryVelocity ?? 0;
+    // Commit the dismissal when dragged a third of the way across or flung to
+    // the right; otherwise spring the bar back to rest.
+    if (_dragX.value > width * 0.33 || velocity > 700) {
+      _animate(_dragX.value, width + 48, then: widget.pc.dismissPlayer);
+    } else {
+      _animate(_dragX.value, 0);
+    }
+  }
+
+  void _animate(double from, double to, {VoidCallback? then}) {
+    _slide.reset();
+    final tween = Tween(begin: from, end: to)
+        .animate(CurvedAnimation(parent: _slide, curve: Curves.easeOutCubic));
+    void tick() => _dragX.value = tween.value;
+    tween.addListener(tick);
+    _slide.forward().whenComplete(() {
+      tween.removeListener(tick);
+      then?.call();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = Get.find<DynamicColorController>();
+    final pc = widget.pc;
+    final song = widget.song;
     final art = sizedThumb(song.artUri?.toString(), ThumbnailSize.micro);
+    final width = MediaQuery.sizeOf(context).width;
 
-    return Padding(
+    return ValueListenableBuilder<double>(
+      valueListenable: _dragX,
+      builder: (context, dx, child) {
+        // Fade the bar out as it slides away; fully opaque at rest.
+        final opacity = (1.0 - (dx / width)).clamp(0.0, 1.0);
+        return Transform.translate(
+          offset: Offset(dx, 0),
+          child: Opacity(opacity: opacity, child: child),
+        );
+      },
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenMargin),
       child: GestureDetector(
         onTap: () => _openNowPlaying(context),
         onVerticalDragEnd: (d) {
           if ((d.primaryVelocity ?? 0) < -100) _openNowPlaying(context);
         },
+        // Swipe right: the bar follows the finger, then slides off-screen and
+        // tears down the session (stops playback, clears the queue) so the
+        // screen reclaims the space. A short drag springs back.
+        onHorizontalDragStart: (_) => _slide.stop(),
+        onHorizontalDragUpdate: _onDragUpdate,
+        onHorizontalDragEnd: _onDragEnd,
         // Tint follows the artwork accent; rebuilds only when the accent changes.
         child: Obx(() => GlassContainer(
               radius: AppRadius.lg,
@@ -244,6 +311,7 @@ class _Bar extends StatelessWidget {
                 ),
               ),
             )),
+      ),
       ),
     );
   }

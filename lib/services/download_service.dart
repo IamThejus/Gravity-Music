@@ -24,6 +24,13 @@ import 'app_paths.dart';
 import 'background_task.dart';
 import 'library_service.dart';
 
+/// Thrown by [DownloadService.download] when the caller cancels a download in
+/// flight (via the `isCancelled` callback). Lets callers distinguish a
+/// user cancellation from a real failure.
+class DownloadCancelledException implements Exception {
+  const DownloadCancelledException();
+}
+
 class DownloadService {
   static Box get _box => Hive.box('DownloadsBox');
 
@@ -92,6 +99,7 @@ class DownloadService {
   static Future<void> download(
     LibraryTrack track, {
     void Function(double progress)? onProgress,
+    bool Function()? isCancelled,
   }) async {
     final videoId = track.videoId;
 
@@ -110,21 +118,31 @@ class DownloadService {
     final part = File('$dir/$videoId.m4a.part');
 
     final client = http.Client();
+    IOSink? sink;
     try {
       final resp = await client.send(http.Request('GET', Uri.parse(audio.url)));
       final total = resp.contentLength ?? audio.size;
-      final sink = part.openWrite();
+      sink = part.openWrite();
       var received = 0;
       await for (final chunk in resp.stream) {
+        // Abort mid-stream if the user cancelled. The catch below deletes the
+        // partial file and the exception propagates as a cancellation.
+        if (isCancelled?.call() ?? false) {
+          throw const DownloadCancelledException();
+        }
         sink.add(chunk);
         received += chunk.length;
         if (total > 0) onProgress?.call((received / total).clamp(0.0, 1.0));
       }
       await sink.flush();
       await sink.close();
+      sink = null;
       if (await file.exists()) await file.delete();
       await part.rename(file.path);
     } catch (e) {
+      try {
+        await sink?.close();
+      } catch (_) {}
       if (await part.exists()) await part.delete();
       rethrow;
     } finally {

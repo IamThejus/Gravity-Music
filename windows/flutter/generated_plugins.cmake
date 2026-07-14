@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
+  media_kit_libs_windows_audio
   passkeys_windows
   share_plus
   url_launcher_windows

@@ -25,6 +25,10 @@ import 'package:path_provider/path_provider.dart';
 /// "Failed to create file cache" and the following seek(0) fails, breaking
 /// skip/auto-advance/loop. Creating it up front is idempotent and cheap.
 void ensureMpvCacheDir() {
+  // The XDG cache path only applies to Linux; on Windows `$HOME` is unset
+  // (it's `%USERPROFILE%`) so the old path resolved to "null/.cache/mpv".
+  // Windows' libmpv resolves its own cache dir, so this is a Linux-only fix.
+  if (!Platform.isLinux) return;
   final env = Platform.environment;
   final cacheHome = (env['XDG_CACHE_HOME']?.isNotEmpty ?? false)
       ? env['XDG_CACHE_HOME']!

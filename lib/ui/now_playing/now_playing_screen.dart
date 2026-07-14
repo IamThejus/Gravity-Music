@@ -645,13 +645,32 @@ class _LyricsOverlayState extends State<_LyricsOverlay> {
                         horizontal: AppSpacing.stackLg, vertical: 80),
                     itemCount: lyrics.parsedLyrics.length,
                     itemBuilder: (_, i) {
+                      // activeIndex + accent are read inside the enclosing Obx,
+                      // so the list re-renders (and each line's AnimatedDefault-
+                      // TextStyle animates) as the active line advances.
                       final active = i == lyrics.activeIndex.value;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Text(
-                          lyrics.parsedLyrics[i].text,
-                          style: AppText.heading(size: 22).copyWith(
-                            color: active ? Colors.white : Colors.white38,
+                      final accent =
+                          Get.find<DynamicColorController>().accent.value;
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        // Tap a line to seek playback to that line's time.
+                        onTap: () {
+                          AppHaptics.light();
+                          pc.seek(lyrics.parsedLyrics[i].timestamp);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 10, horizontal: 4),
+                          child: AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOut,
+                            style: AppText.heading(size: active ? 26 : 22)
+                                .copyWith(
+                              fontWeight:
+                                  active ? FontWeight.w700 : FontWeight.w600,
+                              color: active ? accent : Colors.white38,
+                            ),
+                            child: Text(lyrics.parsedLyrics[i].text),
                           ),
                         ),
                       );

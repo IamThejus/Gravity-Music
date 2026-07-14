@@ -629,7 +629,14 @@ class _LyricsOverlayState extends State<_LyricsOverlay> {
   final pc = Get.find<PlayerController>();
   late final Worker _posWorker;
   late final Worker _activeWorker;
+  late final Worker _openWorker;
+  late final Worker _modeWorker;
   final ItemScrollController _itemScroll = ItemScrollController();
+
+  // Where the active line sits vertically in the full-list view: 0 = top,
+  // 1 = bottom. 0.4 keeps the current line just above centre so a few upcoming
+  // lines stay visible.
+  static const double _activeAlignment = 0.4;
 
   @override
   void initState() {
@@ -639,19 +646,40 @@ class _LyricsOverlayState extends State<_LyricsOverlay> {
     _posWorker = ever(pc.progressBarState, (ProgressBarState s) {
       if (lyrics.isOpen.value) lyrics.updatePlaybackPosition(s.current);
     });
-    // Auto-centre the active line. ScrollablePositionedList scrolls by INDEX
-    // (alignment 0.42 ≈ centred), so it works for any line height and even
-    // when the target is off-screen (e.g. after a seek) — unlike the old
-    // fixed-pixel math.
+    // Auto-centre the active line. ScrollablePositionedList scrolls by INDEX,
+    // so it works for any line height and even when the target is off-screen
+    // (e.g. after a seek) — unlike the old fixed-pixel math.
     _activeWorker = ever(lyrics.activeIndex, (int i) {
       if (!lyrics.isOpen.value || !lyrics.hasSynced.value) return;
+      if (lyrics.focusMode.value) return; // focus view has no scroll list
       if (i < 0 || !_itemScroll.isAttached) return;
       _itemScroll.scrollTo(
         index: i,
-        alignment: 0.42,
+        alignment: _activeAlignment,
         duration: const Duration(milliseconds: 400),
         curve: Curves.easeOutCubic,
       );
+    });
+    // Centre immediately when the sheet is opened or the user switches back to
+    // the full list — the per-line auto-scroll above only fires on the *next*
+    // line change, which could leave the current line off-centre for seconds.
+    _openWorker = ever(lyrics.isOpen, (bool open) {
+      if (open) _centerNow();
+    });
+    _modeWorker = ever(lyrics.focusMode, (_) => _centerNow());
+  }
+
+  /// Jump (no animation) so the current line is centred right after a build.
+  /// Reads activeIndex non-reactively (we're inside a worker callback, not an
+  /// Obx), so it never creates a spurious dependency.
+  void _centerNow() {
+    if (!lyrics.hasSynced.value || lyrics.focusMode.value) return;
+    final i = lyrics.activeIndex.value;
+    if (i < 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_itemScroll.isAttached) {
+        _itemScroll.jumpTo(index: i, alignment: _activeAlignment);
+      }
     });
   }
 
@@ -659,6 +687,8 @@ class _LyricsOverlayState extends State<_LyricsOverlay> {
   void dispose() {
     _posWorker.dispose();
     _activeWorker.dispose();
+    _openWorker.dispose();
+    _modeWorker.dispose();
     // Leaving Now Playing (swipe-back / minimise to the mini-player pops this
     // route) must not leave the lyrics tab "open" — otherwise it reappears the
     // next time the screen is opened. Reset so lyrics only show on explicit tap.
@@ -683,6 +713,22 @@ class _LyricsOverlayState extends State<_LyricsOverlay> {
                 child: Row(
                   children: [
                     Expanded(child: Text('LYRICS', style: AppText.label())),
+                    // Mode toggle — only meaningful for synced lyrics.
+                    Obx(() => lyrics.hasSynced.value
+                        ? Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: GlassIconButton(
+                              icon: lyrics.focusMode.value
+                                  ? Icons.notes_rounded // → show full lyrics
+                                  : Icons
+                                      .center_focus_strong_rounded, // → focus line
+                              onTap: () {
+                                AppHaptics.light();
+                                lyrics.toggleFocusMode();
+                              },
+                            ),
+                          )
+                        : const SizedBox.shrink()),
                     GlassIconButton(
                         icon: Icons.close_rounded, onTap: lyrics.closeLyrics),
                   ],
@@ -690,6 +736,7 @@ class _LyricsOverlayState extends State<_LyricsOverlay> {
               ),
               Expanded(
                 child: Obx(() {
+                  // Plain (unsynced) lyrics: scrollable text block, no highlight.
                   if (!lyrics.hasSynced.value) {
                     return SingleChildScrollView(
                       padding: const EdgeInsets.all(AppSpacing.stackLg),
@@ -701,47 +748,121 @@ class _LyricsOverlayState extends State<_LyricsOverlay> {
                       ),
                     );
                   }
-                  return ScrollablePositionedList.builder(
-                    itemScrollController: _itemScroll,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.stackLg, vertical: 80),
-                    itemCount: lyrics.parsedLyrics.length,
-                    itemBuilder: (_, i) {
-                      // activeIndex + accent are read inside the enclosing Obx,
-                      // so the list re-renders (and each line's AnimatedDefault-
-                      // TextStyle animates) as the active line advances.
-                      final active = i == lyrics.activeIndex.value;
-                      final accent =
-                          Get.find<DynamicColorController>().accent.value;
-                      return InkWell(
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                        // Tap a line to seek playback to that line's time.
-                        onTap: () {
-                          AppHaptics.light();
-                          pc.seek(lyrics.parsedLyrics[i].timestamp);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 10, horizontal: 4),
-                          child: AnimatedDefaultTextStyle(
-                            duration: const Duration(milliseconds: 220),
-                            curve: Curves.easeOut,
-                            style: AppText.heading(size: active ? 26 : 22)
-                                .copyWith(
-                              fontWeight:
-                                  active ? FontWeight.w700 : FontWeight.w600,
-                              color: active ? accent : Colors.white38,
-                            ),
-                            child: Text(lyrics.parsedLyrics[i].text),
-                          ),
-                        ),
-                      );
-                    },
-                  );
+                  // Synced lyrics: focus view (current line only) or full list.
+                  // This Obx rebuilds only on hasSynced/focusMode; per-line
+                  // reactivity to activeIndex lives in the inner Obx below.
+                  return lyrics.focusMode.value
+                      ? _focusLyrics()
+                      : _fullLyrics();
                 }),
               ),
             ],
           ),
+        ),
+      );
+    });
+  }
+
+  // ── Full scrolling lyrics ─────────────────────────────────────────────────
+  // Every line advances through the whole song; the current line is centred
+  // (see _activeAlignment) and highlighted. Each line wraps its style in its
+  // OWN Obx so it recolors reactively when activeIndex changes — the list's
+  // itemBuilder is called lazily, so reads here are NOT tracked by the parent
+  // Obx; a per-line Obx is what makes the highlight actually update.
+  Widget _fullLyrics() {
+    return ScrollablePositionedList.builder(
+      itemScrollController: _itemScroll,
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.stackLg, vertical: 80),
+      itemCount: lyrics.parsedLyrics.length,
+      itemBuilder: (_, i) {
+        return Obx(() {
+          final active = i == lyrics.activeIndex.value;
+          final accent = Get.find<DynamicColorController>().accent.value;
+          return InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            // Tap a line to seek playback to that line's time.
+            onTap: () {
+              AppHaptics.light();
+              pc.seek(lyrics.parsedLyrics[i].timestamp);
+            },
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
+                style: AppText.heading(size: active ? 28 : 21).copyWith(
+                  fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                  color: active ? accent : Colors.white.withOpacity(0.28),
+                  height: 1.25,
+                  shadows: active
+                      ? [Shadow(color: accent.withOpacity(0.45), blurRadius: 18)]
+                      : null,
+                ),
+                child: Text(lyrics.parsedLyrics[i].text),
+              ),
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  // ── Focus view (current line only) ────────────────────────────────────────
+  // Shows just the active line, large and centred, with the previous/next
+  // lines faint above and below for context. No scrolling, so the current
+  // line is always dead-centre and unmissable.
+  Widget _focusLyrics() {
+    return Obx(() {
+      final i = lyrics.activeIndex.value;
+      final accent = Get.find<DynamicColorController>().accent.value;
+      final lines = lyrics.parsedLyrics;
+
+      Widget lineAt(int idx, {required bool active}) {
+        if (idx < 0 || idx >= lines.length) return const SizedBox(height: 24);
+        return AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOut,
+          style: AppText.heading(size: active ? 30 : 19).copyWith(
+            fontWeight: active ? FontWeight.w800 : FontWeight.w500,
+            color: active ? accent : Colors.white.withOpacity(0.30),
+            height: 1.3,
+            shadows: active
+                ? [Shadow(color: accent.withOpacity(0.5), blurRadius: 24)]
+                : null,
+          ),
+          textAlign: TextAlign.center,
+          child: Text(lines[idx].text, textAlign: TextAlign.center),
+        );
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.stackLg),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (i < 0)
+              Text('♪',
+                  textAlign: TextAlign.center,
+                  style: AppText.heading(size: 40)
+                      .copyWith(color: Colors.white.withOpacity(0.3)))
+            else ...[
+              lineAt(i - 1, active: false),
+              const SizedBox(height: 22),
+              InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                onTap: () {
+                  AppHaptics.light();
+                  pc.seek(lines[i].timestamp);
+                },
+                child: lineAt(i, active: true),
+              ),
+              const SizedBox(height: 22),
+              lineAt(i + 1, active: false),
+            ],
+          ],
         ),
       );
     });

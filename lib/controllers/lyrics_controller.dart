@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 
 import '../services/yt_music_service.dart';
@@ -30,12 +31,29 @@ class LyricsController extends GetxController {
   final plainLyrics  = ''.obs;
   final dominantColor = const Color(0xFF1C1A2E).obs;
 
+  /// Lyrics display mode (synced lyrics only). false = full scrolling list,
+  /// true = "focus" view showing only the current line (with faint neighbours).
+  /// Persisted so the user's choice survives restarts.
+  final focusMode = false.obs;
+
   final Map<String, _CachedLyrics> _lyricsCache = {};
   final Map<String, Color>         _colorCache  = {};
 
   String?  _currentTrackId;
   Timer?   _throttleTimer;
   Duration _lastPosition = Duration.zero;
+
+  @override
+  void onInit() {
+    super.onInit();
+    focusMode.value =
+        Hive.box('AppPrefs').get('lyricsFocusMode', defaultValue: false);
+  }
+
+  void toggleFocusMode() {
+    focusMode.value = !focusMode.value;
+    Hive.box('AppPrefs').put('lyricsFocusMode', focusMode.value);
+  }
 
   @override
   void onClose() {

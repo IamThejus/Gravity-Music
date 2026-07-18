@@ -504,6 +504,7 @@
       <div class="dl-right">
         <div class="dl-btns">
           <a class="btn btn-primary js-dl-apk" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Android APK</a>
+          <a class="btn btn-ghost js-dl-win" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Windows Installer</a>
           <a class="btn btn-ghost js-dl-deb" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Linux .deb</a>
           <a class="btn btn-ghost js-dl-rpm" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Linux .rpm</a>
         </div>
@@ -539,9 +540,13 @@
       const apk = data.assets.find(a => a.name.endsWith('.apk'));
       const deb = data.assets.find(a => a.name.endsWith('.deb'));
       const rpm = data.assets.find(a => a.name.endsWith('.rpm'));
+      // Prefer the Inno .exe installer; fall back to the .msix if only that ships.
+      const win = data.assets.find(a => a.name.endsWith('.exe'))
+                || data.assets.find(a => a.name.endsWith('.msix'));
 
       document.querySelectorAll('.js-version').forEach(el => el.textContent = version);
       if (apk) document.querySelectorAll('.js-dl-apk').forEach(el => el.href = apk.browser_download_url);
+      if (win) document.querySelectorAll('.js-dl-win').forEach(el => el.href = win.browser_download_url);
       if (deb) document.querySelectorAll('.js-dl-deb').forEach(el => el.href = deb.browser_download_url);
       if (rpm) document.querySelectorAll('.js-dl-rpm').forEach(el => el.href = rpm.browser_download_url);
     } catch (_) {}

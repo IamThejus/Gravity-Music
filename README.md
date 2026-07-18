@@ -58,6 +58,18 @@ A premium music streaming app with dynamic album-driven visuals, a floating glas
   </tr>
 </table>
 
+## Download
+
+Grab the latest build for your platform from the [**Releases**](https://github.com/IamThejus/Gravity-Music/releases/latest) page:
+
+| Platform | Package |
+|----------|---------|
+| **Android** | `.apk` (sideload) |
+| **Windows** | `.exe` installer (also available as `.msix`) |
+| **Linux** | `.deb` / `.rpm` |
+
+> Builds are signed with a debug / self-signed certificate (not the Play Store or Microsoft Store), so your OS shows a first-run warning — this is expected for a sideloaded, open-source app. On **Windows** choose **More info → Run anyway**; on **Android** allow installs from your browser or file manager.
+
 ## Features
 
 - **Cinematic Dark UI** — obsidian glassmorphism design with floating navigation, a floating mini-player, and blurred translucent surfaces
@@ -92,9 +104,11 @@ A premium music streaming app with dynamic album-driven visuals, a floating glas
 flutter pub get           # install dependencies
 flutter run               # run on a connected Android device/emulator
 flutter run -d linux      # run on Linux desktop
+flutter run -d windows    # run on Windows desktop
 flutter analyze           # static analysis
 flutter test              # run the test suite
 flutter build apk         # build a release APK
+flutter build windows     # build the Windows release runner
 ```
 
 ## Architecture

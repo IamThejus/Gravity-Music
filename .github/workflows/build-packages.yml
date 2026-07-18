@@ -204,3 +204,31 @@ jobs:
           files: dist/*.msix
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── .exe installer (Inno Setup) ─────────────────────────────────────────
+      # Packages the same release runner into a classic single-file installer
+      # (gravity-music-<version>-setup.exe). Reuses the build above — no second
+      # compile. Unsigned, so SmartScreen warns once (More info -> Run anyway).
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build .exe installer (Inno Setup)
+        shell: pwsh
+        run: |
+          & iscc /DAppVersion=$env:PKG_VERSION windows\packaging\gravity-music.iss
+          Get-ChildItem dist
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gravity-music-windows-installer
+          path: dist/*-setup.exe
+          if-no-files-found: error
+
+      - name: Attach installer to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*-setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

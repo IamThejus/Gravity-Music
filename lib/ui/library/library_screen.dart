@@ -499,8 +499,35 @@ class _LibraryRow extends StatelessWidget {
 /// Sign-in / account tile for optional cloud sync. Renders nothing unless
 /// Supabase is configured (SyncService registered). Signed out → "Sign in to
 /// sync"; signed in → email + live sync status, tap for Sync now / Sign out.
-class _AccountRow extends StatelessWidget {
+class _AccountRow extends StatefulWidget {
   const _AccountRow();
+
+  @override
+  State<_AccountRow> createState() => _AccountRowState();
+}
+
+class _AccountRowState extends State<_AccountRow> {
+  @override
+  void initState() {
+    super.initState();
+    // SyncService is registered asynchronously at startup: Supabase initialises
+    // AFTER the first frame, then the controller is put. The Library is built
+    // (inside the IndexedStack) before that finishes, so a bare
+    // Get.isRegistered check runs too early and never re-evaluates. Poll briefly
+    // and rebuild once the controller registers, so the account row appears.
+    if (!Get.isRegistered<SyncService>()) _awaitRegistration();
+  }
+
+  Future<void> _awaitRegistration() async {
+    for (var i = 0; i < 40; i++) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) return;
+      if (Get.isRegistered<SyncService>()) {
+        setState(() {});
+        return;
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

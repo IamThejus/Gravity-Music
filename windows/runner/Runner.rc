@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "saraharmony" "\0"
+            VALUE "CompanyName", "Gravity Music" "\0"
+            VALUE "FileDescription", "Gravity Music" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "saraharmony" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "saraharmony.exe" "\0"
-            VALUE "ProductName", "saraharmony" "\0"
+            VALUE "InternalName", "Gravity Music" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Gravity Music. All rights reserved." "\0"
+            VALUE "OriginalFilename", "Gravity Music.exe" "\0"
+            VALUE "ProductName", "Gravity Music" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

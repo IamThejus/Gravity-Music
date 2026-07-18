@@ -79,6 +79,12 @@ msix_config:
 flutter_launcher_icons:
   android: true
   ios: true
+  # Regenerates windows/runner/resources/app_icon.ico from the source PNG so
+  # the desktop app no longer ships the default Flutter template icon.
+  windows:
+    generate: true
+    image_path: "assets/app_icon.png"
+    icon_size: 256
   image_path: "assets/app_icon.png"
   remove_alpha_ios: true
 

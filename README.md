@@ -1,6 +1,12 @@
 # Gravity Music
 
-A premium music streaming app with dynamic album-driven visuals, a floating glassmorphism UI, personalized on-device discovery, playlists, and an immersive Apple Music-inspired listening experience — built with Flutter and powered by YouTube as a streaming backend. Runs on Android (primary target) and Linux/Windows desktop.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Android%20%7C%20Windows%20%7C%20Linux-blue)](#download)
+[![Built with Flutter](https://img.shields.io/badge/built%20with-Flutter-02569B?logo=flutter)](https://flutter.dev)
+
+A free and open-source music player with dynamic album-driven visuals, a floating glassmorphism UI, personalized on-device discovery, and playlists — built with Flutter and streaming from YouTube. Runs on Android (primary target) and Linux/Windows desktop.
+
+**No ads. No trackers. No accounts. No paywalls.** Every feature is available to everyone, forever — there is no paid tier and nothing is held back. Personalization (mixes, recommendations, taste profile) is computed entirely **on your device**; there is no backend server collecting your listening data. Cloud sync is optional and opt-in.
 
 
 <img src="media/banner.png" alt="Gravity Music Banner" />
@@ -75,15 +81,32 @@ Grab the latest build for your platform from the [**Releases**](https://github.c
 - **Cinematic Dark UI** — obsidian glassmorphism design with floating navigation, a floating mini-player, and blurred translucent surfaces
 - **Dynamic theming** — accent and background colors are extracted from the current track's artwork
 - **Home** — recently played, personalized "Mixes" generated on-device from your listening history (Artist Mixes, Discovery, Repeat Rewind, Throwbacks, Favorites), and your playlists
-- **Search** — search YouTube Music for any song, artist, or genre
+- **Search** — find songs, artists, and genres on YouTube Music, plus **album results**: open an album for its full tracklist, artwork and metadata, then play or shuffle it like any playlist
 - **Library** — liked songs, custom playlists, and offline downloads
 - **Offline playlists** — download an entire playlist for offline listening in the background, with progress and completion badges on the playlist tile
-- **Playlist import** — import playlists directly from Spotify or Apple Music links, running in the background while you keep listening
+- **Playlist import** — import playlists from **YouTube / YouTube Music, Spotify, or Apple Music** links, running in the background while you keep listening. YouTube links import *exactly* (real video IDs, nothing guessed); Spotify and Apple tracks are matched by search
 - **Now Playing** — full-screen player with synced lyrics, queue management, shuffle/loop, sleep timer, and streaming quality toggle
 - **Background playback** — lock-screen and notification controls with high-resolution artwork, loudness normalization, and session restore across app restarts
 - **Android Auto** — browse and play your playlists from the car
-- **Offline-friendly caching** — resolved stream URLs, song downloads, home/playlist data are cached locally
+- **Desktop experience** — sidebar layout, a persistent now-playing bar with a volume slider, and full keyboard shortcuts (see below)
+- **Offline-friendly caching** — resolved stream URLs, song downloads, home/playlist/album data are cached locally
 - **Cloud sync (optional)** — sign in with Google to back up and sync your liked songs and playlists across devices via Supabase; the app remains fully offline and account-free unless you opt in
+
+## Keyboard Shortcuts (desktop)
+
+Shortcuts work on every screen. They're automatically disabled while you're typing in the search field, so `Space` still types a space.
+
+| Key | Action |
+|-----|--------|
+| `Space` | Play / pause |
+| `←` / `→` | Seek backward / forward 10s |
+| `Ctrl` + `←` / `→` | Previous / next track |
+| `↑` / `↓` | Volume up / down |
+| `M` | Mute toggle |
+| `L` | Like current track |
+| `S` / `R` | Shuffle / repeat |
+| `Ctrl` + `F` | Jump to search |
+| `Esc` | Close lyrics, or go back |
 
 ## Tech Stack
 
@@ -131,9 +154,25 @@ Personalization:
 
 Stream URLs resolve cache-first: downloaded file (`file://`) → cached URL → fresh fetch via an isolate, modeled by `HMStreamingData`.
 
+## Contributing
+
+Contributions are welcome — issues, feature ideas, and pull requests all help.
+
+1. Fork the repo and create a branch off `main`
+2. Run `flutter analyze` and `flutter test` before opening a PR
+3. Match the surrounding code style; most files carry a header comment explaining *why* they're structured the way they are — worth reading before changing one
+
+If you're unsure whether an idea fits, open an issue first and let's talk it through. Bug reports are just as valuable as code: please include your platform, app version, and steps to reproduce.
+
+## License
+
+The **source code** is released under the [MIT License](LICENSE) — free to use, modify, and redistribute. If you build something on top of it, a link back is appreciated but not required.
+
+Note that the MIT license applies to this repository's code, not to the music it plays. The app itself is distributed free of charge and is **not intended for monetization or resale** — see the disclaimer below.
+
 ## Disclaimer
 
-This project is a **personal, experimental app** built for learning and exploration. It is not intended for commercial use, monetization, or sale.
+This project is built for learning and exploration, and is not affiliated with or endorsed by YouTube, Google, Spotify, or Apple.
 
 Gravity Music streams audio from **YouTube** using YouTube's internal APIs and [`youtube_explode_dart`](https://pub.dev/packages/youtube_explode_dart). It does not host, store, or redistribute any audio or video content — all media is served directly from YouTube's CDN in real time, the same way a browser would.
 

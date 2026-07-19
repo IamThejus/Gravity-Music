@@ -1,6 +1,6 @@
 // ui/library/import_playlist.dart
 //
-// Playlist Import flow (Spotify / Apple Music → Gravity Music):
+// Playlist Import flow (Spotify / Apple Music / YouTube → Gravity Music):
 //   1. URL bottom sheet            → showImportPlaylistSheet()
 //   2. Preview screen              → ImportPreviewScreen (count, ETA, songs)
 //   3. "Playlist name" dialog      → _promptPlaylistName()
@@ -61,9 +61,12 @@ class _ImportUrlSheetState extends State<_ImportUrlSheet> {
       setState(() => _error = 'Paste a playlist link to continue.');
       return;
     }
-    if (!url.contains('spotify.com') && !url.contains('music.apple.com')) {
-      setState(() =>
-          _error = 'Only Spotify and Apple Music playlist links are supported.');
+    if (!url.contains('spotify.com') &&
+        !url.contains('music.apple.com') &&
+        !url.contains('youtube.com') &&
+        !url.contains('youtu.be')) {
+      setState(() => _error =
+          'Only Spotify, Apple Music and YouTube playlist links are supported.');
       return;
     }
 
@@ -119,7 +122,8 @@ class _ImportUrlSheetState extends State<_ImportUrlSheet> {
             const SizedBox(height: 16),
             Text('Import Playlist', style: AppText.heading(size: 22)),
             const SizedBox(height: 4),
-            Text('Paste a Spotify or Apple Music playlist link.',
+            Text('Paste a Spotify, Apple Music or YouTube playlist link.\n'
+                'YouTube links import exactly — others are matched by search.',
                 style: AppText.subtitle(size: 14)),
             const SizedBox(height: AppSpacing.gutter),
             GlassContainer(
@@ -145,7 +149,7 @@ class _ImportUrlSheetState extends State<_ImportUrlSheet> {
                         contentPadding:
                             const EdgeInsets.symmetric(vertical: 14),
                         border: InputBorder.none,
-                        hintText: 'https://open.spotify.com/playlist/…',
+                        hintText: 'https://music.youtube.com/playlist?list=…',
                         hintStyle: AppText.subtitle(size: 14),
                       ),
                     ),

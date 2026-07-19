@@ -18,6 +18,7 @@ import 'controllers/playlist_download_controller.dart';
 import 'services/audio_handler.dart';
 import 'services/battery_optimization.dart';
 import 'ui/app_theme.dart';
+import 'ui/shell/app_shortcuts.dart';
 import 'ui/shell/root_shell.dart';
 import 'ui/theme/dynamic_color_controller.dart';
 import 'ui/theme/motion.dart';
@@ -169,6 +170,12 @@ class YTPlayerApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
+      // Mounts the global keyboard shortcuts ABOVE the root Navigator, so they
+      // resolve on every route — including pushed full-screen ones (Now
+      // Playing, Album/Mix detail). Previously they lived inside DesktopShell,
+      // below the Navigator, and never fired on a pushed route.
+      builder: (context, child) =>
+          AppShortcuts(child: child ?? const SizedBox.shrink()),
       home: const RootShell(),
     );
   }

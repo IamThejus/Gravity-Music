@@ -59,6 +59,30 @@ class YtMusicAlbum {
   });
 }
 
+/// A YouTube / YouTube Music playlist with its ordered track list.
+///
+/// Unlike the Spotify / Apple importers — which scrape (title, artist) strings
+/// and must then *guess* the matching YouTube song — this carries real
+/// `videoId`s, so importing a YT playlist is exact rather than fuzzy.
+class YtMusicPlaylist {
+  final String playlistId;
+  final String title;
+  final String thumbnail;
+  final List<YtMusicSong> tracks;
+
+  /// True when paging stopped at [YtMusicService._maxPlaylistPages] before the
+  /// playlist ended, so [tracks] is a prefix of the real list.
+  final bool truncated;
+
+  const YtMusicPlaylist({
+    required this.playlistId,
+    required this.title,
+    required this.thumbnail,
+    required this.tracks,
+    this.truncated = false,
+  });
+}
+
 /// A fully-resolved album: the header metadata plus its ordered track list.
 /// Returned by [YtMusicService.albumDetail].
 class YtMusicAlbumDetail {
@@ -597,6 +621,148 @@ class YtMusicService {
     );
   }
 
+  // ── Playlists ──────────────────────────────────────────────────────────────
+
+  /// Safety cap on continuation pages (~100 tracks each) so a pathological
+  /// playlist can't page forever.
+  static const _maxPlaylistPages = 20;
+
+  /// Fetches a YouTube / YouTube Music playlist by its `list=` id, following
+  /// continuations until the playlist ends or [_maxPlaylistPages] is hit.
+  /// Returns null on any failure.
+  static Future<YtMusicPlaylist?> playlist(String playlistId) async {
+    final id = playlistId.trim();
+    if (id.isEmpty) return null;
+
+    final first = await _browsePlaylist(id);
+    if (first != null) return first;
+
+    if (await _refreshConfig()) {
+      final second = await _browsePlaylist(id);
+      if (second != null) return second;
+    }
+    return null;
+  }
+
+  static Future<YtMusicPlaylist?> _browsePlaylist(String playlistId) async {
+    try {
+      // YT Music addresses a playlist page as browseId "VL" + playlistId.
+      final browseId =
+          playlistId.startsWith('VL') ? playlistId : 'VL$playlistId';
+
+      final firstBody = await _postBrowse({'browseId': browseId});
+      if (firstBody == null) return null;
+
+      var title = '';
+      var cover = '';
+      final headers = <dynamic>[];
+      _collect(firstBody, 'musicResponsiveHeaderRenderer', headers);
+      if (headers.isEmpty) {
+        _collect(firstBody, 'musicDetailHeaderRenderer', headers);
+      }
+      if (headers.isNotEmpty && headers.first is Map) {
+        final h = headers.first as Map;
+        title = _runsText(h['title']);
+        cover = _largestThumb(h['thumbnail']);
+      }
+
+      final tracks = <YtMusicSong>[];
+      final seen = <String>{};
+      var token = _collectTracks(firstBody, tracks, seen);
+
+      // Follow continuations for playlists longer than the first page.
+      var pages = 1;
+      while (token != null && pages < _maxPlaylistPages) {
+        final next = await _postBrowse({'continuation': token});
+        if (next == null) break;
+        final before = tracks.length;
+        token = _collectTracks(next, tracks, seen);
+        pages++;
+        if (tracks.length == before) break; // no progress — stop
+      }
+
+      if (title.isEmpty && tracks.isEmpty) return null;
+
+      return YtMusicPlaylist(
+        playlistId: playlistId,
+        title: title.isEmpty ? 'Imported Playlist' : title,
+        thumbnail: cover,
+        tracks: tracks,
+        truncated: token != null && pages >= _maxPlaylistPages,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Appends every track row found in [data] to [tracks] (deduped by [seen]) and
+  /// returns the next continuation token, or null when there isn't one.
+  static String? _collectTracks(
+      dynamic data, List<YtMusicSong> tracks, Set<String> seen) {
+    final items = <dynamic>[];
+    _collect(data, 'musicResponsiveListItemRenderer', items);
+    for (final it in items) {
+      if (it is! Map) continue;
+      final t = _parseTrackRow(it, '', '');
+      if (t != null && seen.add(t.videoId)) tracks.add(t);
+    }
+    return _continuationToken(data);
+  }
+
+  /// Current shape nests the token under continuationItemRenderer; the legacy
+  /// shape used nextContinuationData. Both are checked.
+  static String? _continuationToken(dynamic data) {
+    final cont = <dynamic>[];
+    _collect(data, 'continuationItemRenderer', cont);
+    for (final c in cont) {
+      if (c is! Map) continue;
+      final tok = c['continuationEndpoint']?['continuationCommand']?['token'];
+      if (tok is String && tok.isNotEmpty) return tok;
+    }
+    final legacy = <dynamic>[];
+    _collect(data, 'nextContinuationData', legacy);
+    for (final c in legacy) {
+      if (c is! Map) continue;
+      final tok = c['continuation'];
+      if (tok is String && tok.isNotEmpty) return tok;
+    }
+    return null;
+  }
+
+  /// POSTs one youtubei `browse` request with [extra] merged into the body.
+  /// Returns the decoded JSON, or null on any failure.
+  static Future<dynamic> _postBrowse(Map<String, dynamic> extra) async {
+    try {
+      final res = await http
+          .post(
+            Uri.parse('https://music.youtube.com/youtubei/v1/browse'
+                '?prettyPrint=false'),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Origin': 'https://music.youtube.com',
+              'User-Agent': _ua,
+            },
+            body: jsonEncode({
+              'context': {
+                'client': {
+                  'clientName': 'WEB_REMIX',
+                  'clientVersion': _clientVersion,
+                  'hl': 'en',
+                  'gl': 'US',
+                }
+              },
+              ...extra,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── Album parsing ──────────────────────────────────────────────────────────
 
   static List<YtMusicAlbum> _parseAlbums(dynamic data) {
@@ -716,7 +882,7 @@ class YtMusicService {
     final seen = <String>{};
     for (final it in items) {
       if (it is! Map) continue;
-      final t = _parseAlbumTrack(it, cover, artist);
+      final t = _parseTrackRow(it, cover, artist);
       if (t != null && seen.add(t.videoId)) tracks.add(t);
     }
 
@@ -732,10 +898,12 @@ class YtMusicService {
     );
   }
 
-  /// Parses one album track row. Album rows frequently omit their own thumbnail
-  /// (they share the album cover) and list the artist as plain text, so both
-  /// fall back to the album-level [cover] / [albumArtist].
-  static YtMusicSong? _parseAlbumTrack(
+  /// Parses one track row from an album or playlist page (both use
+  /// `musicResponsiveListItemRenderer`). Album rows frequently omit their own
+  /// thumbnail (they share the album cover) and list the artist as plain text,
+  /// so both fall back to [cover] / [albumArtist]; playlist rows normally carry
+  /// their own and simply ignore the fallbacks.
+  static YtMusicSong? _parseTrackRow(
       Map item, String cover, String albumArtist) {
     // videoId — first watchEndpoint, else the row's playlistItemData.
     final watch = <dynamic>[];

@@ -24,6 +24,17 @@ import 'desktop_shell.dart';
 import 'floating_nav_bar.dart';
 import 'responsive.dart';
 
+/// Lets non-descendant code (the global keyboard shortcuts, which are mounted
+/// ABOVE the Navigator and so can't reach RootShell's State) switch tabs.
+/// Set while a RootShell is mounted, cleared on dispose.
+class ShellNav {
+  ShellNav._();
+
+  static const int searchTabIndex = 1;
+
+  static void Function(int index)? goToTab;
+}
+
 class RootShell extends StatefulWidget {
   const RootShell({super.key});
 
@@ -58,6 +69,12 @@ class _RootShellState extends State<RootShell>
   late final Animation<double> _fade =
       _transition.drive(CurveTween(curve: AppMotion.standardCurve));
 
+  @override
+  void initState() {
+    super.initState();
+    ShellNav.goToTab = _onTap;
+  }
+
   void _onTap(int i) {
     // Tapping "Queue" while something plays could also open Now Playing;
     // we keep it as a full tab here for discoverability.
@@ -68,6 +85,7 @@ class _RootShellState extends State<RootShell>
 
   @override
   void dispose() {
+    if (ShellNav.goToTab == _onTap) ShellNav.goToTab = null;
     _transition.dispose();
     super.dispose();
   }

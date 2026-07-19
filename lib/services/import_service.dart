@@ -49,7 +49,10 @@ class ImportService {
   static Future<PlaylistImportDetails> fetchDetails(String url) async {
     final playlist = await PlaylistImporter.fetch(url);
     // ~1s per song to match on YouTube Music (matches the old server estimate).
-    final estSeconds = playlist.tracks.length.clamp(1, 600);
+    // Tracks that arrive already resolved (YouTube sources carry real videoIds)
+    // need no search at all, so they don't count toward the estimate.
+    final needMatch = playlist.tracks.where((t) => !t.isResolved).length;
+    final estSeconds = needMatch == 0 ? 2 : needMatch.clamp(1, 600);
     final songNames = playlist.tracks
         .map((t) => t.artist.isEmpty ? t.title : '${t.title} — ${t.artist}')
         .toList();
@@ -79,10 +82,25 @@ class ImportService {
 
     final results = <SearchResult>[];
     for (var i = 0; i < tracks.length; i++) {
+      final t = tracks[i];
       try {
-        final matches = await YtMusicService.searchSongs(tracks[i].query);
-        if (matches.isNotEmpty) {
-          results.add(SearchResult.fromYtMusic(matches.first));
+        if (t.isResolved) {
+          // Source was YouTube — the videoId is already exact, so skip the
+          // search entirely. Routed through fromYtMusic so the thumbnail gets
+          // the same size-tier upgrade as a matched track.
+          results.add(SearchResult.fromYtMusic(YtMusicSong(
+            videoId: t.videoId!,
+            title: t.title,
+            artists: t.artist.isEmpty ? const [] : [t.artist],
+            album: '',
+            thumbnail: t.thumbnail,
+            duration: t.duration,
+          )));
+        } else {
+          final matches = await YtMusicService.searchSongs(t.query);
+          if (matches.isNotEmpty) {
+            results.add(SearchResult.fromYtMusic(matches.first));
+          }
         }
       } catch (_) {
         // Skip a track that fails to match; keep importing the rest.

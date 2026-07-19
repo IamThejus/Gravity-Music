@@ -25,12 +25,30 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'import_service.dart' show ImportException;
+import 'yt_music_service.dart';
 
 /// A single track extracted from an external playlist (pre-match).
 class ImportedTrack {
   final String title;
   final String artist;
-  const ImportedTrack(this.title, this.artist);
+
+  /// Exact YouTube videoId, set only when the SOURCE is YouTube itself. When
+  /// present, ImportService skips the fuzzy search-match step entirely — a YT
+  /// playlist import is exact, where Spotify/Apple imports are best guesses.
+  final String? videoId;
+  final String thumbnail;
+  final String duration;
+
+  const ImportedTrack(
+    this.title,
+    this.artist, {
+    this.videoId,
+    this.thumbnail = '',
+    this.duration = '',
+  });
+
+  /// True when this track already knows its YouTube id (no matching needed).
+  bool get isResolved => videoId != null && videoId!.isNotEmpty;
 
   /// Query used to match this track on YouTube Music.
   String get query => artist.isEmpty ? title : '$title $artist';
@@ -77,9 +95,12 @@ class PlaylistImporter {
       result = await _spotify(url);
     } else if (url.contains('music.apple.com')) {
       result = await _apple(url);
+    } else if (url.contains('youtube.com') || url.contains('youtu.be')) {
+      // Covers music.youtube.com too (it contains "youtube.com").
+      result = await _youtube(url);
     } else {
       throw const ImportException(
-          'Only Spotify and Apple Music playlist links are supported.');
+          'Only Spotify, Apple Music and YouTube playlist links are supported.');
     }
 
     if (result.tracks.isEmpty) {
@@ -186,6 +207,54 @@ class PlaylistImporter {
       await Future.delayed(const Duration(milliseconds: 120));
     }
     return out;
+  }
+
+  // ── YouTube / YouTube Music ──────────────────────────────────────────────
+  //
+  // No HTML scraping here: the app already speaks youtubei, so a YT playlist is
+  // fetched through YtMusicService and arrives with real videoIds. That makes
+  // this the only EXACT importer — Spotify/Apple tracks still have to be
+  // guessed at by search, and a wrong guess is invisible to the user.
+
+  static Future<ScrapedPlaylist> _youtube(String url) async {
+    final id = _youtubeListId(url);
+    if (id == null) {
+      throw const ImportException(
+          'That YouTube link doesn’t contain a playlist. Copy a link with a '
+          '“list=” in it (Share → Copy link from a playlist).');
+    }
+
+    final pl = await YtMusicService.playlist(id);
+    if (pl == null) {
+      throw const ImportException(
+          'Couldn’t open this YouTube playlist. It may be private or removed.');
+    }
+
+    final tracks = pl.tracks
+        .map((t) => ImportedTrack(
+              t.title,
+              t.artists.join(', '),
+              videoId: t.videoId,
+              thumbnail: t.thumbnail,
+              duration: t.duration,
+            ))
+        .toList();
+
+    return ScrapedPlaylist(
+      name: pl.title,
+      tracks: tracks,
+      truncated: pl.truncated,
+    );
+  }
+
+  /// Pulls the `list=` id out of any YouTube/YT-Music playlist URL form.
+  static String? _youtubeListId(String url) {
+    final fromQuery = Uri.tryParse(url)?.queryParameters['list'];
+    if (fromQuery != null && fromQuery.isNotEmpty) return fromQuery;
+    // Fallback for unencoded / nonstandard links the Uri parser trips on.
+    final m = RegExp(r'[?&]list=([A-Za-z0-9_-]+)').firstMatch(url);
+    final id = m?.group(1);
+    return (id == null || id.isEmpty) ? null : id;
   }
 
   // ── Apple Music ──────────────────────────────────────────────────────────

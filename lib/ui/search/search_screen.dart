@@ -30,6 +30,13 @@ class SearchUiController extends GetxController {
   final loading = false.obs;
   Timer? _debounce;
 
+  /// Owned here rather than built in SearchScreen.build() — a controller
+  /// constructed during build is recreated on every rebuild, which drops the
+  /// typed text. The FocusNode also lets Ctrl+F (global shortcuts) put the
+  /// caret in this field from outside the widget tree.
+  final textController = TextEditingController();
+  final searchFocus = FocusNode();
+
   void onChanged(String value) {
     query.value = value;
     _debounce?.cancel();
@@ -43,9 +50,11 @@ class SearchUiController extends GetxController {
     _debounce = Timer(const Duration(milliseconds: 350), () => _run(value));
   }
 
-  /// Runs a query immediately (used by genre cards).
+  /// Runs a query immediately (used by genre cards). Mirrors the term into the
+  /// field so the search box reflects what's actually being shown.
   void runQuery(String value) {
     query.value = value;
+    textController.text = value;
     _debounce?.cancel();
     loading.value = true;
     _run(value);
@@ -67,6 +76,8 @@ class SearchUiController extends GetxController {
   @override
   void onClose() {
     _debounce?.cancel();
+    textController.dispose();
+    searchFocus.dispose();
     super.onClose();
   }
 }
@@ -91,7 +102,6 @@ class SearchScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final sc = Get.put(SearchUiController());
     final pc = Get.find<PlayerController>();
-    final controller = TextEditingController();
 
     void play(SearchResult r) {
       AppHaptics.light();
@@ -139,7 +149,8 @@ class SearchScreen extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
-                      controller: controller,
+                      controller: sc.textController,
+                      focusNode: sc.searchFocus,
                       onChanged: sc.onChanged,
                       style: AppText.title(size: 15),
                       cursorColor: Colors.white,
@@ -157,7 +168,7 @@ class SearchScreen extends StatelessWidget {
                       ? const SizedBox.shrink()
                       : GestureDetector(
                           onTap: () {
-                            controller.clear();
+                            sc.textController.clear();
                             sc.onChanged('');
                           },
                           child: const Icon(Icons.close_rounded,

@@ -110,6 +110,22 @@ class CacheService {
   static void savePlaylist(String id, Map<String, dynamic> json) =>
       _write(_plKey(id), json);
 
+  // ── Album detail ────────────────────────────────────────────────────────────
+
+  static String _albumKey(String id) => 'album:$id';
+
+  /// Returns fresh (within 24hr) cached album detail, or null if missing/stale.
+  static Map<String, dynamic>? getFreshAlbum(String id) =>
+      _read(_albumKey(id), _plTtlMinutes);
+
+  /// Returns cached album detail regardless of age (offline / stale fallback).
+  static Map<String, dynamic>? getAnyAlbum(String id) =>
+      _readAny(_albumKey(id));
+
+  /// Saves album detail to persistent cache.
+  static void saveAlbum(String id, Map<String, dynamic> json) =>
+      _write(_albumKey(id), json);
+
   // ── Mixes ("Made For You") ───────────────────────────────────────────────────
 
   /// Returns fresh (within 24hr) cached mixes payload, or null if missing/stale.

@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/player_controller.dart';
+import '../../services/album_service.dart';
 import '../../services/search_service.dart';
 import '../../services/thumb_util.dart';
 import '../app_theme.dart';
@@ -18,12 +19,14 @@ import '../theme/glass.dart';
 import '../shell/responsive.dart';
 import '../ui_helpers.dart';
 import '../widgets/common_widgets.dart';
+import 'album_detail_screen.dart';
 
 // ── Controller ───────────────────────────────────────────────────────────────
 
 class SearchUiController extends GetxController {
   final query = ''.obs;
   final results = <SearchResult>[].obs;
+  final albums = <Album>[].obs;
   final loading = false.obs;
   Timer? _debounce;
 
@@ -32,6 +35,7 @@ class SearchUiController extends GetxController {
     _debounce?.cancel();
     if (value.trim().isEmpty) {
       results.clear();
+      albums.clear();
       loading.value = false;
       return;
     }
@@ -48,9 +52,15 @@ class SearchUiController extends GetxController {
   }
 
   Future<void> _run(String value) async {
-    final res = await SearchService.autocomplete(value);
+    // Songs and albums resolve independently — fetch both at once so the album
+    // strip and the track list land together rather than serially.
+    final res = await Future.wait([
+      SearchService.autocomplete(value),
+      AlbumService.search(value),
+    ]);
     if (query.value.trim() != value.trim()) return; // superseded
-    results.assignAll(res);
+    results.assignAll(res[0] as List<SearchResult>);
+    albums.assignAll(res[1] as List<Album>);
     loading.value = false;
   }
 
@@ -93,6 +103,12 @@ class SearchScreen extends StatelessWidget {
         thumbnail: r.thumbnail,
         duration: r.durationValue,
       );
+    }
+
+    void openAlbum(Album a) {
+      AppHaptics.light();
+      Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => AlbumDetailScreen(album: a)));
     }
 
     return SafeArea(
@@ -156,22 +172,30 @@ class SearchScreen extends StatelessWidget {
             child: Obx(() {
               // Results view when a query is active.
               if (sc.query.value.trim().isNotEmpty) {
-                if (sc.loading.value && sc.results.isEmpty) {
+                final songs = sc.results;
+                final albums = sc.albums;
+                if (sc.loading.value && songs.isEmpty && albums.isEmpty) {
                   return const Center(
                       child: CircularProgressIndicator(color: Colors.white));
                 }
-                if (sc.results.isEmpty) {
+                if (songs.isEmpty && albums.isEmpty) {
                   return const EmptyState(
                     icon: Icons.search_off_rounded,
                     title: 'No results',
                     message: 'Try a different song or artist.',
                   );
                 }
+                // Albums strip (if any) sits above the song list, as a single
+                // header item so the whole thing scrolls together.
+                final hasAlbums = albums.isNotEmpty;
                 return ListView.builder(
                   padding: EdgeInsets.only(bottom: bottomDockInset(context)),
-                  itemCount: sc.results.length,
+                  itemCount: songs.length + (hasAlbums ? 1 : 0),
                   itemBuilder: (_, i) {
-                    final r = sc.results[i];
+                    if (hasAlbums && i == 0) {
+                      return _AlbumStrip(albums: albums, onOpen: openAlbum);
+                    }
+                    final r = songs[i - (hasAlbums ? 1 : 0)];
                     return TrackTile(
                       imageUrl: sizedThumb(r.thumbnail, ThumbnailSize.tile),
                       title: r.title,
@@ -187,6 +211,73 @@ class SearchScreen extends StatelessWidget {
             }),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Albums strip (horizontal cards above the song results) ────────────────────
+
+class _AlbumStrip extends StatelessWidget {
+  final List<Album> albums;
+  final void Function(Album) onOpen;
+  const _AlbumStrip({required this.albums, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'Albums'),
+        SizedBox(
+          height: 208,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.screenMargin),
+            itemCount: albums.length,
+            separatorBuilder: (_, __) =>
+                const SizedBox(width: AppSpacing.gutter),
+            itemBuilder: (_, i) =>
+                _AlbumCard(album: albums[i], onTap: () => onOpen(albums[i])),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.stackMd),
+      ],
+    );
+  }
+}
+
+class _AlbumCard extends StatelessWidget {
+  final Album album;
+  final VoidCallback onTap;
+  const _AlbumCard({required this.album, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 148,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ArtImage(
+                url: sizedThumb(album.thumbnail, ThumbnailSize.card),
+                size: 148,
+                radius: AppRadius.lg),
+            const SizedBox(height: 8),
+            Text(prettyTitle(album.title),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.trackTitle(size: 14)),
+            if (album.subtitle.isNotEmpty)
+              Text(prettyTitle(album.subtitle),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.subtitle(size: 12.5)),
+          ],
+        ),
       ),
     );
   }

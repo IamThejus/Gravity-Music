@@ -631,6 +631,28 @@ class _AccountRowState extends State<_AccountRow> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Surface WHY a sync failed — the row subtitle only says "Sync
+            // failed", which isn't enough to tell a network drop from an auth
+            // or permission (RLS) problem.
+            Obx(() {
+              final err = sync.lastError.value;
+              if (err == null || err.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.error_outline_rounded,
+                        color: AppColors.accent, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(err,
+                          style: AppText.subtitle(size: 12.5), maxLines: 4),
+                    ),
+                  ],
+                ),
+              );
+            }),
             ListTile(
               leading: const Icon(Icons.sync_rounded, color: AppColors.accent),
               title: Text('Sync now', style: AppText.title(size: 15)),

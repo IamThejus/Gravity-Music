@@ -69,7 +69,16 @@ class SyncService extends GetxController {
 
   Future<void> signIn() async {
     final u = await AuthService.instance.signInWithGoogle();
-    if (u != null) user.value = u; // _fullSync runs via the auth listener
+    if (u == null) return; // user cancelled the account picker
+    user.value = u;
+    // Drive the sync EXPLICITLY rather than relying on the auth-state listener.
+    // The listener only syncs when it observes a signed-out→signed-in edge; if
+    // this assignment landed first (a microtask-ordering race) it saw
+    // `wasSignedIn == true` and skipped _fullSync entirely — leaving the
+    // account signed in with nothing pulled down from Supabase. _fullSync is
+    // _busy-guarded, so whichever path gets there first wins and the other
+    // no-ops.
+    await _fullSync();
   }
 
   Future<void> signOut() async {

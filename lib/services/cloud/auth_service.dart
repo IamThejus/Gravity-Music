@@ -11,6 +11,7 @@
 // signInWithIdToken. Desktop (Linux/Windows) is not supported by google_sign_in
 // 7.x's authenticate(); a browser OAuth fallback can be added later.
 
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -69,13 +70,32 @@ class AuthService {
     try {
       account = await google.authenticate(scopeHint: const ['email']);
     } on GoogleSignInException catch (e) {
+      // Always log the raw failure — Android's Credential Manager reports a
+      // CONFIG mismatch (unregistered SHA-1 for this package's OAuth client)
+      // with the same `canceled` code it uses when the user dismisses the
+      // sheet. Swallowing that silently made a broken signing key look like
+      // "the button does nothing"; logcat now always shows the real reason.
+      debugPrint('[auth] GoogleSignInException '
+          'code=${e.code} description=${e.description}');
       if (e.code == GoogleSignInExceptionCode.canceled) return null;
+      if (e.code == GoogleSignInExceptionCode.clientConfigurationError ||
+          e.code == GoogleSignInExceptionCode.providerConfigurationError) {
+        throw AuthException(
+            'Google sign-in is misconfigured for this build — check that this '
+            'app\'s signing SHA-1 is registered on the Android OAuth client. '
+            '(${e.description ?? e.code})');
+      }
       throw AuthException('Google sign-in failed: ${e.description ?? e.code}');
     }
 
     final idToken = account.authentication.idToken;
     if (idToken == null) {
-      throw const AuthException('Google sign-in returned no ID token.');
+      // Almost always the serverClientId isn't the *Web* client ID, or this
+      // build's SHA-1 isn't on the Android OAuth client.
+      throw const AuthException(
+          'Google sign-in returned no ID token — the OAuth client for this '
+          'build looks misconfigured (check the signing SHA-1 and that '
+          'GOOGLE_WEB_CLIENT_ID is the Web client ID).');
     }
 
     final res = await _client.auth.signInWithIdToken(

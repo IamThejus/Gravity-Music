@@ -40,6 +40,45 @@ class YtMusicSong {
   });
 }
 
+/// A YouTube Music album search hit — the *header* only (no track list yet).
+/// The track list is fetched lazily via [YtMusicService.albumDetail] using
+/// [browseId] (an `MPREb_…` id), mirroring how YT Music opens an album page.
+class YtMusicAlbum {
+  final String browseId; // MPREb_… — browse this to get the tracks
+  final String title;
+  final String artist;
+  final String year;
+  final String thumbnail; // square album cover (ThumbUtil-resizable)
+
+  const YtMusicAlbum({
+    required this.browseId,
+    required this.title,
+    required this.artist,
+    required this.year,
+    required this.thumbnail,
+  });
+}
+
+/// A fully-resolved album: the header metadata plus its ordered track list.
+/// Returned by [YtMusicService.albumDetail].
+class YtMusicAlbumDetail {
+  final String browseId;
+  final String title;
+  final String artist;
+  final String year;
+  final String thumbnail;
+  final List<YtMusicSong> tracks;
+
+  const YtMusicAlbumDetail({
+    required this.browseId,
+    required this.title,
+    required this.artist,
+    required this.year,
+    required this.thumbnail,
+    required this.tracks,
+  });
+}
+
 class YtMusicService {
   // The youtubei endpoints accept requests with NO innertube API key, so none
   // is stored here — keeping the source free of any Google-API-key-shaped
@@ -51,6 +90,11 @@ class YtMusicService {
 
   // "Songs" filter param → returns Art Tracks (clean official audio) only.
   static const _songsParams = 'EgWKAQIIAWoMEA4QChADEAQQCRAF';
+
+  // "Albums" filter param → returns album cards (browseId-addressable pages)
+  // instead of songs. Same shape as the songs param with the type byte flipped
+  // (II→IY), matching YT Music's own search-chip request.
+  static const _albumsParams = 'EgWKAQIYAWoMEA4QChADEAQQCRAF';
 
   static const _ua =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
@@ -65,6 +109,7 @@ class YtMusicService {
       _dynamicClientVersion ?? _defaultClientVersion;
 
   static final RegExp _durationRe = RegExp(r'^\d+(:\d{2})+$');
+  static final RegExp _yearRe = RegExp(r'^\d{4}$');
 
   /// Searches the YouTube Music catalog for songs. Returns clean Art-Track
   /// results, or an empty list on any error (caller treats that as no results).
@@ -84,10 +129,24 @@ class YtMusicService {
     return [];
   }
 
-  /// One search attempt. Returns the parsed list on a 200 response (an empty
-  /// list is a legitimate "no results"), or `null` on any failure (non-200 /
-  /// exception) so the caller can refresh the key and retry.
+  /// One song-search attempt. Returns the parsed list on a 200 response (an
+  /// empty list is a legitimate "no results"), or `null` on any failure
+  /// (non-200 / exception) so the caller can refresh the key and retry.
   static Future<List<YtMusicSong>?> _search(String query) async {
+    final data = await _postSearch(query, _songsParams);
+    if (data == null) return null;
+    try {
+      return _parseSongs(data);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// POSTs one youtubei search request with the given filter [params] and
+  /// returns the decoded JSON body, or `null` on any failure (non-200 /
+  /// exception). Shared by the song and album search paths — they differ only
+  /// in the filter param and how the response is parsed.
+  static Future<dynamic> _postSearch(String query, String params) async {
     try {
       final res = await http
           .post(
@@ -108,13 +167,92 @@ class YtMusicService {
                 }
               },
               'query': query,
-              'params': _songsParams,
+              'params': params,
             }),
           )
           .timeout(const Duration(seconds: 10));
 
       if (res.statusCode != 200) return null;
-      return _parseSongs(jsonDecode(res.body));
+      return jsonDecode(res.body);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Searches the YouTube Music catalog for albums. Returns album *headers*
+  /// (browse them via [albumDetail] to get tracks), or an empty list on any
+  /// error. Uses the same lazy key-refresh-on-failure path as [searchSongs].
+  static Future<List<YtMusicAlbum>> searchAlbums(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return [];
+
+    final first = await _searchAlbums(q);
+    if (first != null) return first;
+
+    if (await _refreshConfig()) {
+      final second = await _searchAlbums(q);
+      if (second != null) return second;
+    }
+    return [];
+  }
+
+  /// One album-search attempt. `null` on failure so the caller can refresh the
+  /// client version and retry.
+  static Future<List<YtMusicAlbum>?> _searchAlbums(String query) async {
+    final data = await _postSearch(query, _albumsParams);
+    if (data == null) return null;
+    try {
+      return _parseAlbums(data);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fetches a single album's full track list + header metadata by browsing its
+  /// [browseId] (an `MPREb_…` id from [searchAlbums]). Returns `null` on any
+  /// error. Same lazy key-refresh-on-failure path as the other endpoints.
+  static Future<YtMusicAlbumDetail?> albumDetail(String browseId) async {
+    if (browseId.isEmpty) return null;
+
+    final first = await _browseAlbum(browseId);
+    if (first != null) return first;
+
+    if (await _refreshConfig()) {
+      final second = await _browseAlbum(browseId);
+      if (second != null) return second;
+    }
+    return null;
+  }
+
+  /// One album-browse attempt. Returns the parsed album on a 200, or `null` on
+  /// any failure so the caller can refresh the key and retry.
+  static Future<YtMusicAlbumDetail?> _browseAlbum(String browseId) async {
+    try {
+      final res = await http
+          .post(
+            Uri.parse('https://music.youtube.com/youtubei/v1/browse'
+                '?prettyPrint=false'),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Origin': 'https://music.youtube.com',
+              'User-Agent': _ua,
+            },
+            body: jsonEncode({
+              'context': {
+                'client': {
+                  'clientName': 'WEB_REMIX',
+                  'clientVersion': _clientVersion,
+                  'hl': 'en',
+                  'gl': 'US',
+                }
+              },
+              'browseId': browseId,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (res.statusCode != 200) return null;
+      return _parseAlbumDetail(jsonDecode(res.body), browseId);
     } catch (_) {
       return null;
     }
@@ -457,6 +595,254 @@ class YtMusicService {
       thumbnail: thumbnail,
       duration: duration,
     );
+  }
+
+  // ── Album parsing ──────────────────────────────────────────────────────────
+
+  static List<YtMusicAlbum> _parseAlbums(dynamic data) {
+    final items = <dynamic>[];
+    _collect(data, 'musicResponsiveListItemRenderer', items);
+
+    final albums = <YtMusicAlbum>[];
+    final seen = <String>{};
+    for (final it in items) {
+      if (it is! Map) continue;
+      final album = _parseAlbumItem(it);
+      if (album != null && seen.add(album.browseId)) albums.add(album);
+    }
+    return albums;
+  }
+
+  static YtMusicAlbum? _parseAlbumItem(Map item) {
+    // browseId — the album's own browse endpoint (MPREb_… / pageType ALBUM).
+    final navs = <dynamic>[];
+    _collect(item, 'browseEndpoint', navs);
+    String? browseId;
+    for (final n in navs) {
+      if (n is! Map) continue;
+      final bid = n['browseId'];
+      if (bid is! String || bid.isEmpty) continue;
+      final pageType = n['browseEndpointContextSupportedConfigs']
+              ?['browseEndpointContextMusicConfig']?['pageType'];
+      if (pageType == 'MUSIC_PAGE_TYPE_ALBUM' || bid.startsWith('MPREb')) {
+        browseId = bid;
+        break;
+      }
+    }
+    if (browseId == null) return null;
+
+    final flex = item['flexColumns'];
+    if (flex is! List || flex.isEmpty) return null;
+
+    final title = _columnText(flex[0]);
+    if (title.isEmpty) return null;
+
+    // Subtitle row: "Album • Artist • Year" (or "Single • Artist • Year").
+    var artist = '';
+    var year = '';
+    if (flex.length > 1) {
+      final runs = _columnRuns(flex[1]);
+      for (final r in runs) {
+        if (r is! Map) continue;
+        final text = (r['text'] ?? '').toString().trim();
+        if (text.isEmpty || text == '•') continue;
+        if (_pageType(r) == 'MUSIC_PAGE_TYPE_ARTIST') {
+          if (artist.isEmpty) artist = text;
+        } else if (_yearRe.hasMatch(text)) {
+          year = text;
+        }
+      }
+      // Fallback when the artist run carries no pageType: take the first run
+      // that isn't the type label ("Album"/"Single"/"EP") or the year.
+      if (artist.isEmpty) {
+        for (final r in runs) {
+          if (r is! Map) continue;
+          final text = (r['text'] ?? '').toString().trim();
+          if (text.isEmpty || text == '•' || _yearRe.hasMatch(text)) continue;
+          final low = text.toLowerCase();
+          if (low == 'album' || low == 'single' || low == 'ep') continue;
+          artist = text;
+          break;
+        }
+      }
+    }
+
+    return YtMusicAlbum(
+      browseId: browseId,
+      title: title,
+      artist: artist,
+      year: year,
+      thumbnail: _largestThumb(item['thumbnail']),
+    );
+  }
+
+  static YtMusicAlbumDetail? _parseAlbumDetail(dynamic data, String browseId) {
+    // ── Header: title / artist / year / cover ──
+    final headers = <dynamic>[];
+    _collect(data, 'musicResponsiveHeaderRenderer', headers); // current shape
+    if (headers.isEmpty) {
+      _collect(data, 'musicDetailHeaderRenderer', headers); // legacy shape
+    }
+
+    var title = '';
+    var artist = '';
+    var year = '';
+    var cover = '';
+    if (headers.isNotEmpty && headers.first is Map) {
+      final h = headers.first as Map;
+      title = _runsText(h['title']);
+      // Newer header exposes the artist as `straplineTextOne`.
+      artist = _runsText(h['straplineTextOne']);
+      final subRuns = h['subtitle']?['runs'];
+      if (subRuns is List) {
+        for (final r in subRuns) {
+          if (r is! Map) continue;
+          final text = (r['text'] ?? '').toString().trim();
+          if (_yearRe.hasMatch(text)) year = text;
+          if (artist.isEmpty && _pageType(r) == 'MUSIC_PAGE_TYPE_ARTIST') {
+            artist = text;
+          }
+        }
+      }
+      cover = _largestThumb(h['thumbnail']);
+    }
+
+    // ── Tracks ── (album rows are musicResponsiveListItemRenderer inside the
+    // track shelf; related-album carousels use musicTwoRowItemRenderer, so they
+    // aren't picked up here).
+    final items = <dynamic>[];
+    _collect(data, 'musicResponsiveListItemRenderer', items);
+    final tracks = <YtMusicSong>[];
+    final seen = <String>{};
+    for (final it in items) {
+      if (it is! Map) continue;
+      final t = _parseAlbumTrack(it, cover, artist);
+      if (t != null && seen.add(t.videoId)) tracks.add(t);
+    }
+
+    if (title.isEmpty && tracks.isEmpty) return null;
+
+    return YtMusicAlbumDetail(
+      browseId: browseId,
+      title: title,
+      artist: artist,
+      year: year,
+      thumbnail: cover,
+      tracks: tracks,
+    );
+  }
+
+  /// Parses one album track row. Album rows frequently omit their own thumbnail
+  /// (they share the album cover) and list the artist as plain text, so both
+  /// fall back to the album-level [cover] / [albumArtist].
+  static YtMusicSong? _parseAlbumTrack(
+      Map item, String cover, String albumArtist) {
+    // videoId — first watchEndpoint, else the row's playlistItemData.
+    final watch = <dynamic>[];
+    _collect(item, 'watchEndpoint', watch);
+    String? videoId;
+    for (final w in watch) {
+      if (w is Map && w['videoId'] is String) {
+        videoId = w['videoId'] as String;
+        break;
+      }
+    }
+    if (videoId == null || videoId.isEmpty) {
+      final pid = item['playlistItemData']?['videoId'];
+      if (pid is String && pid.isNotEmpty) videoId = pid;
+    }
+    if (videoId == null || videoId.isEmpty) return null;
+
+    final flex = item['flexColumns'];
+    if (flex is! List || flex.isEmpty) return null;
+
+    final title = _columnText(flex[0]);
+    if (title.isEmpty) return null;
+
+    // Artists — prefer ARTIST-typed runs; else the first non-duration run.
+    final artists = <String>[];
+    if (flex.length > 1) {
+      final runs = _columnRuns(flex[1]);
+      for (final r in runs) {
+        if (r is! Map) continue;
+        final text = (r['text'] ?? '').toString().trim();
+        if (text.isEmpty || text == '•') continue;
+        if (_pageType(r) == 'MUSIC_PAGE_TYPE_ARTIST') artists.add(text);
+      }
+      if (artists.isEmpty) {
+        for (final r in runs) {
+          if (r is! Map) continue;
+          final text = (r['text'] ?? '').toString().trim();
+          if (text.isEmpty || text == '•' || _durationRe.hasMatch(text)) {
+            continue;
+          }
+          artists.add(text);
+          break;
+        }
+      }
+    }
+    if (artists.isEmpty && albumArtist.isNotEmpty) artists.add(albumArtist);
+
+    // Duration — album rows carry it in fixedColumns; fall back to any flex run.
+    var duration = '';
+    final fixed = item['fixedColumns'];
+    if (fixed is List) {
+      for (final c in fixed) {
+        final t = _fixedColumnText(c).trim();
+        if (_durationRe.hasMatch(t)) {
+          duration = t;
+          break;
+        }
+      }
+    }
+    if (duration.isEmpty) {
+      for (final c in flex) {
+        for (final r in _columnRuns(c)) {
+          if (r is! Map) continue;
+          final t = (r['text'] ?? '').toString().trim();
+          if (_durationRe.hasMatch(t)) {
+            duration = t;
+            break;
+          }
+        }
+        if (duration.isNotEmpty) break;
+      }
+    }
+
+    var thumbnail = _largestThumb(item['thumbnail']);
+    if (thumbnail.isEmpty) thumbnail = cover;
+
+    return YtMusicSong(
+      videoId: videoId,
+      title: title,
+      artists: artists,
+      album: '',
+      thumbnail: thumbnail,
+      duration: duration,
+    );
+  }
+
+  /// Largest (last) thumbnail URL anywhere under [node], or '' if none.
+  static String _largestThumb(dynamic node) {
+    final lists = <dynamic>[];
+    _collect(node ?? const {}, 'thumbnails', lists);
+    for (final list in lists) {
+      if (list is List && list.isNotEmpty && list.last is Map) {
+        final url = (list.last['url'] ?? '').toString();
+        if (url.isNotEmpty) return url;
+      }
+    }
+    return '';
+  }
+
+  static String _fixedColumnText(dynamic column) {
+    if (column is! Map) return '';
+    final runs = column['musicResponsiveListItemFixedColumnRenderer']?['text']
+        ?['runs'];
+    if (runs is List && runs.isNotEmpty && runs.first is Map) {
+      return (runs.first['text'] ?? '').toString();
+    }
+    return '';
   }
 
   static List<dynamic> _columnRuns(dynamic column) {

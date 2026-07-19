@@ -5,6 +5,8 @@
 // The artwork uses a Hero (tag `np-art`) shared with the mini-player so the
 // expand/collapse transition is a true shared-element morph.
 
+import 'dart:io' show Platform;
+
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +26,11 @@ import '../ui_helpers.dart';
 import '../widgets/common_widgets.dart';
 
 const String kNowPlayingArtTag = 'np-art';
+
+/// Volume slider only makes sense where there's no OS hardware volume path
+/// wired to the app — i.e. the desktop backends (media_kit). Matches where the
+/// desktop NowPlayingBar exposes its own volume slider.
+final bool _isDesktop = Platform.isLinux || Platform.isWindows || Platform.isMacOS;
 
 class NowPlayingScreen extends StatelessWidget {
   const NowPlayingScreen({super.key});
@@ -217,6 +224,12 @@ class _PlayerBodyState extends State<_PlayerBody>
                 _SeekBar(pc: pc),
                 const SizedBox(height: AppSpacing.stackSm),
                 _Controls(pc: pc),
+                // Volume slider — desktop only (mobile relies on hardware
+                // volume buttons; its mini-player has no volume control either).
+                if (_isDesktop) ...[
+                  const SizedBox(height: AppSpacing.stackSm),
+                  _VolumeBar(pc: pc),
+                ],
                 const SizedBox(height: AppSpacing.stackMd),
                 _SecondaryBar(pc: pc),
               ],
@@ -543,6 +556,76 @@ class _Controls extends StatelessWidget {
             )),
       ],
     );
+  }
+}
+
+// ── Volume (desktop) ────────────────────────────────────────────────────────
+// Mirrors the desktop NowPlayingBar's volume control: a mute-aware icon + a
+// 0–100 slider bound to PlayerController.volume / setVolume. Tapping the icon
+// toggles mute by restoring the pre-mute level.
+class _VolumeBar extends StatefulWidget {
+  final PlayerController pc;
+  const _VolumeBar({required this.pc});
+
+  @override
+  State<_VolumeBar> createState() => _VolumeBarState();
+}
+
+class _VolumeBarState extends State<_VolumeBar> {
+  // Remembers the level to restore when un-muting via the icon tap.
+  double _lastNonZero = 100;
+
+  IconData _iconFor(double v) {
+    if (v <= 0) return Icons.volume_off_rounded;
+    if (v < 50) return Icons.volume_down_rounded;
+    return Icons.volume_up_rounded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pc = widget.pc;
+    final colors = Get.find<DynamicColorController>();
+    return Obx(() {
+      final vol = pc.volume.value;
+      if (vol > 0) _lastNonZero = vol;
+      // Short, right-aligned control (matches the desktop mini-player's ~110px
+      // slider) rather than a full-width bar that reads like a second seek bar.
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: () {
+              AppHaptics.light();
+              pc.setVolume(vol > 0 ? 0 : _lastNonZero);
+            },
+            icon: Icon(_iconFor(vol),
+                size: 22, color: AppColors.textSecondaryHi),
+          ),
+          SizedBox(
+            width: 110,
+            child: SliderTheme(
+              data: SliderThemeData(
+                trackHeight: 4,
+                activeTrackColor: colors.accent.value,
+                inactiveTrackColor: AppColors.glassFillActive,
+                thumbColor: Colors.white,
+                overlayShape:
+                    const RoundSliderOverlayShape(overlayRadius: 14),
+                thumbShape:
+                    const RoundSliderThumbShape(enabledThumbRadius: 6),
+              ),
+              child: Slider(
+                min: 0,
+                max: 100,
+                value: vol.clamp(0, 100),
+                onChanged: pc.setVolume,
+              ),
+            ),
+          ),
+        ],
+      );
+    });
   }
 }
 

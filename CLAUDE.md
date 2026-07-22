@@ -15,7 +15,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `flutter analyze` — static analysis (uses `flutter_lints`, see `analysis_options.yaml`)
 - `flutter test` — run the test suite (`test/` — pure-Dart service logic + a widget test; the audio handler is never booted)
 - `flutter test test/services/taste_profile_test.dart` — run a single test file
-- `flutter build apk` — build Android release APK
+- `flutter build apk` — build Android release APK. `android/gradle.properties` caps Gradle at `-Xmx4G` deliberately — the previous 8G+4G-metaspace setting got the JVM OOM-killed (build exit 137) on a 15 GB/no-swap machine; don't raise it back without reason.
+- `flutter build windows` — Windows release runner (Windows only). CI additionally packages it into an Inno Setup `.exe` installer via `windows/packaging/gravity-music.iss` (see Platform integration).
+- `dart run flutter_launcher_icons` — regenerate launcher icons (Android/iOS/**Windows `.ico`**) from `assets/app_icon.png`
 
 ## Design reference
 
@@ -62,10 +64,10 @@ Stream URLs resolve by priority: cached file → downloaded file (`DownloadsBox`
 
 ### Persistence (Hive boxes, opened in `main.dart`)
 
-- `AppPrefs` — settings (streaming quality, loop/shuffle/queue-loop modes, loudness normalization, cache-songs toggle, search history, saved playback session)
+- `AppPrefs` — settings (streaming quality, loop/shuffle/queue-loop modes, loudness normalization, cache-songs toggle, search history, saved playback session, `installationId` — the anonymous heartbeat UUID)
 - `SongsUrlCache` — cached resolved stream URLs keyed by video ID
 - `LibraryBox` — liked songs + custom playlists (`LibraryService`, `LibraryTrack`/`LocalPlaylist`)
-- `CacheBox` — generic TTL'd JSON cache (`CacheService`): home data (2h), playlist details (24h), album details (24h)
+- `CacheBox` — generic TTL'd JSON cache (`CacheService`): home data (2h), playlist details (24h), album details (24h); also `genreArt:<genre>` keys (24h) written directly by the Search screen's Browse tiles
 - `DownloadsBox` — downloaded track metadata + file paths
 - `ListeningHistory` — per-`videoId` play counts/timestamps
 
@@ -85,18 +87,24 @@ GetX throughout — controllers registered via `Get.put`/`Get.find` in `main.dar
   - `_isEditableFocused()` checks the focus context and its **ancestors only**. Never re-add a descendant walk: `FocusableActionDetector`/high-level focus nodes sit above the whole app, and `SearchScreen`'s `TextField` is permanently mounted in `RootShell`'s `IndexedStack`, so a descendant search always finds an `EditableText` and silently disables every shortcut.
 - **`ShellNav`** (`ui/shell/root_shell.dart`) — a static hook (`goToTab`) letting `AppShortcuts` switch tabs; it's mounted above the Navigator and so can't reach `RootShell`'s State. Set in `initState`, cleared in `dispose`.
 - **`SearchUiController`** owns the search `TextEditingController` + `FocusNode` (not `SearchScreen.build`, where they'd be recreated every rebuild and drop typed text). The `FocusNode` is what `Ctrl+F` targets.
+- **Browse genre tiles** (`search_screen.dart` → `_GenreTile`/`_GenreArt`) — each genre tile shows real artwork: the gradient renders instantly (loading state + offline fallback), then a representative thumbnail (first `SearchService.autocomplete(genre)` result) fades in behind a genre-tinted scrim. Art URLs are cached in-memory + `CacheBox` (`genreArt:<genre>`, 24h).
 
 ### Cloud sync (optional, opt-in)
 
 `services/cloud/` — entirely optional; when `SupabaseConfig` isn't configured every method is a safe no-op and the app runs fully offline/account-free.
 
-- **`AuthService`** — Supabase Auth + **native** Google sign-in (`google_sign_in` 7.x `authenticate()`), Android/iOS only; desktop is unsupported and throws. Initialized *after* the first frame in `main.dart` so `Supabase.initialize()` never delays cold start — hence `SyncService` is registered only in that callback, and UI must guard on `Get.isRegistered<SyncService>()`.
+- **`AuthService`** — Supabase Auth + **native** Google sign-in (`google_sign_in` 7.x `authenticate()`), Android/iOS only; desktop is unsupported and throws. Initialized *after* the first frame in `main.dart` so `Supabase.initialize()` never delays cold start — hence `SyncService` is registered only in that callback, and UI must guard on `Get.isRegistered<SyncService>()`. **But that guard alone is a trap:** the Library is built (inside `RootShell`'s `IndexedStack`) *before* the async init completes, and a bare `Get.isRegistered` check never re-evaluates — the account row was invisible for exactly this reason. `_AccountRow` (`library_screen.dart`) is therefore a StatefulWidget that polls briefly after mount and rebuilds once `SyncService` registers. Any new UI gating on `Get.isRegistered<SyncService>()` needs the same treatment.
 - **`SyncService`** — GetX controller; Hive `LibraryBox` stays the source of truth. Sign-in pulls remote and **unions** into local, then pushes the merge; local mutations trigger a debounced full-state push.
 - **Gotcha:** Android reports an *unregistered SHA-1* (a signing/OAuth mismatch) using the same `canceled` code as a genuine user dismissal, so failures can look like "the button does nothing". Every `GoogleSignInException` is now `debugPrint`ed with `[auth]` — check logcat before assuming the code is wrong. Release builds currently sign with the **debug keystore** (`android/app/build.gradle.kts`), so regenerating `~/.android/debug.keystore` breaks sign-in until the new SHA-1 is added to the Android OAuth client.
+
+### Anonymous heartbeat analytics
+
+**`HeartbeatService`** (`services/heartbeat_service.dart`) — posts an anonymous heartbeat to a Cloudflare Worker (`gravity-heartbeat.gravitymusic.workers.dev/api/v1/heartbeat`) that powers the website's "🎧 listening now / 📱 installations" counters (`docs/index.html` reads `/api/v1/stats` and renders them in the hero). Sends **only** `{random UUID v4 (AppPrefs 'installationId'), platform, app_version}` — never anything about the user or what's playing; the file header documents the full privacy contract, keep it accurate. It observes the **existing** `PlayerController.buttonState` via an `ever` worker (no second audio_service listener) and beats only while the state is `playing` — buffering maps to `loading`, so it's excluded by construction. One beat on play start, then every 60s; the timer cancels the instant playback leaves `playing`. All network failures are swallowed silently. If you ever change `buttonState` semantics, remember this service depends on `playing` meaning "genuinely audible playback".
 
 ### Platform integration
 
 - **`ThumbUtil`** (`services/thumb_util.dart`) — rewrites YouTube/googleusercontent thumbnail URLs to the right size tier (`micro`/`tile`/`card`/`art`) for where they're displayed. Always route thumbnails through this.
-- **`BatteryOptimization`** (`services/battery_optimization.dart`) — Android-only `MethodChannel` (`com.saragama/battery`, backed by `MainActivity.kt`) that prompts once to exempt the app from Doze so background playback survives screen-off.
+- **`BatteryOptimization`** (`services/battery_optimization.dart`) — Android-only `MethodChannel` (`com.saragama/battery`, backed by `MainActivity.kt`). `ensureExemption()` goes **straight to the native system dialog** (the old in-app rationale dialog was removed at the user's request) and re-asks each launch until the Doze exemption is actually granted; a silent zero-tap grant is impossible on stock Android.
 - **Desktop audio/MPRIS** — `just_audio` has no native Linux/Windows backend, so `main.dart` initializes `just_audio_media_kit` (libmpv) on **both** Linux and Windows before `AudioService.init()`. media_kit hardcodes libmpv `cache-on-disk=yes`; `ensureMpvCacheDir()` pre-creates `~/.cache/mpv` (libmpv won't, and a missing dir breaks seek/skip/auto-advance). A local patched `just_audio_media_kit` override may exist in `pubspec.yaml`.
   - `audio_service_mpris` (media keys / system media widget) is **Linux-only** — MPRIS is D-Bus. Windows has **no** System Media Transport Controls integration yet, so hardware media keys and the Windows volume-flyout media overlay do nothing there; `smtc_windows` would be the way in. In-app keyboard shortcuts (`AppShortcuts`) are the current Windows substitute, but they only work while the app has focus.
+- **Windows packaging** — CI's `windows` job builds both an MSIX and an Inno Setup `.exe` installer (`windows/packaging/gravity-music.iss`, compiled by ISCC on `windows-latest`; Inno cannot run on Linux). The build still emits `saraharmony.exe` (`BINARY_NAME` in `windows/CMakeLists.txt` — CMake target names can't contain spaces), and the installer ships it renamed to **`Gravity Music.exe`** via Inno `DestName`; window title (`windows/runner/main.cpp`) and `Runner.rc` version-info are branded "Gravity Music". The Inno `AppId` GUID must never change once released — upgrades key off it. Installs per-user (`%LOCALAPPDATA%\Programs`, no UAC); unsigned, so SmartScreen warns once.

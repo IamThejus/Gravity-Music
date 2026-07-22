@@ -144,9 +144,29 @@
   .btn-ghost{ background: var(--glass-bg); border-color: var(--glass-border); color: var(--text-0); backdrop-filter: blur(20px); }
   .btn-ghost:hover{ background: var(--glass-bg-strong); transform: translateY(-2px); }
 
-  .hero-meta{ display:flex; gap:26px; margin-top:46px; }
+  .hero-meta{ display:flex; gap:26px; margin-top:46px; flex-wrap:wrap; align-items:flex-end; }
   .hero-meta div{ font-size:12px; color:var(--text-2); }
   .hero-meta strong{ display:block; font-size:20px; color:var(--text-0); font-weight:700; font-family:'Space Grotesk',sans-serif; }
+
+  /* live heartbeat stats — bigger than the other meta items, revealed with a
+     rise-in once the first fetch succeeds, numbers count up, and the
+     "listening now" figure pulses like a live indicator */
+  .stat-live{ display:none; }
+  .stat-live.on{ display:block; animation: statIn .7s var(--ease) both; }
+  @keyframes statIn{
+    from{ opacity:0; transform: translateY(14px) scale(.94); }
+    to{ opacity:1; transform: none; }
+  }
+  .hero-meta .stat-live strong{
+    font-size:32px; color:var(--accent);
+    text-shadow: 0 0 16px var(--accent-dim);
+    font-variant-numeric: tabular-nums; /* no width jitter while counting up */
+  }
+  .stat-live .js-stat-listening{ animation: livePulse 2.6s ease-in-out infinite; }
+  @keyframes livePulse{
+    0%,100%{ text-shadow: 0 0 10px var(--accent-dim); }
+    50%{ text-shadow: 0 0 26px rgba(54,226,122,.55); }
+  }
 
   /* hero visual */
   .hero-visual{ position:relative; height: 620px; }
@@ -330,11 +350,18 @@
       <h1 class="headline">Music,<br><span class="grad">without gravity.</span></h1>
       <p class="sub">A free and open-source music player powered by YouTube, with on-device personalization, offline downloads, and a glassmorphism UI designed for those who appreciate the weight of every beat. No ads, no trackers, no paywalls.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary js-dl-apk" href="https://github.com/IamThejus/Gravity-Music/releases/latest">Download Gravity</a>
+        <!-- Scrolls to the download section (all platforms) rather than
+             deep-linking the APK — no js-dl-apk class, so the release-asset
+             JS never rewrites this href. -->
+        <a class="btn btn-primary" href="#download">Download Gravity</a>
         <a class="btn btn-ghost" href="https://github.com/IamThejus/Gravity-Music">View Source</a>
       </div>
       <div class="hero-meta">
         <div><strong class="js-version">v1.2.3</strong>Latest release</div>
+        <!-- Live anonymous stats from the heartbeat worker; hidden until the
+             fetch succeeds so an unreachable backend never shows broken UI. -->
+        <div class="js-stat-live stat-live"><strong class="js-stat-listening">0</strong>🎧 Listening now</div>
+        <div class="js-stat-live stat-live"><strong class="js-stat-installs">0</strong>📱 Installations</div>
         <div><strong>0</strong>Accounts required</div>
         <div><strong>100%</strong>Open source</div>
       </div>
@@ -550,6 +577,41 @@
       if (deb) document.querySelectorAll('.js-dl-deb').forEach(el => el.href = deb.browser_download_url);
       if (rpm) document.querySelectorAll('.js-dl-rpm').forEach(el => el.href = rpm.browser_download_url);
     } catch (_) {}
+  })();
+
+  // Live anonymous listening stats (heartbeat worker). Numbers only appear
+  // once a fetch succeeds; "listening now" refreshes every 60s to stay live.
+  // Values count up (0 → n on first load, old → new on refresh).
+  (() => {
+    const STATS = 'https://gravity-heartbeat.gravitymusic.workers.dev/api/v1/stats';
+
+    function countTo(el, target) {
+      const from = parseInt(el.dataset.v ?? '0', 10) || 0;
+      el.dataset.v = target;
+      if (from === target) { el.textContent = target.toLocaleString(); return; }
+      const t0 = performance.now(), dur = 900;
+      requestAnimationFrame(function tick(now) {
+        const p = Math.min((now - t0) / dur, 1);
+        const eased = 1 - Math.pow(1 - p, 3); // ease-out cubic
+        el.textContent = Math.round(from + (target - from) * eased).toLocaleString();
+        if (p < 1) requestAnimationFrame(tick);
+      });
+    }
+
+    async function refreshStats() {
+      try {
+        const res = await fetch(STATS);
+        if (!res.ok) return;
+        const s = await res.json();
+        document.querySelectorAll('.js-stat-live').forEach(el => el.classList.add('on'));
+        document.querySelectorAll('.js-stat-listening').forEach(el =>
+          countTo(el, s.active_listeners ?? 0));
+        document.querySelectorAll('.js-stat-installs').forEach(el =>
+          countTo(el, s.total_installations ?? 0));
+      } catch (_) {}
+    }
+    refreshStats();
+    setInterval(refreshStats, 60000);
   })();
 
   (async () => {

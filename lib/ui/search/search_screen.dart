@@ -6,9 +6,12 @@
 // result plays it via playWithRecommendations and records it in history.
 
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:hive/hive.dart';
 
 import '../../controllers/player_controller.dart';
 import '../../services/album_service.dart';
@@ -346,7 +349,7 @@ class _IdleView extends StatelessWidget {
             ],
           );
         }),
-        SectionHeader(title: 'Browse'),
+        const SectionHeader(title: 'Browse'),
         Padding(
           padding:
               const EdgeInsets.symmetric(horizontal: AppSpacing.screenMargin),
@@ -358,28 +361,159 @@ class _IdleView extends StatelessWidget {
               crossAxisSpacing: AppSpacing.gutter,
               mainAxisSpacing: AppSpacing.gutter,
               childAspectRatio: 1.7,
-              children: _genres.map((g) {
-                return GestureDetector(
-                  onTap: () => sc.runQuery(g.$1),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [g.$2, g.$2.withOpacity(0.4)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(AppRadius.lg),
-                    ),
-                    alignment: Alignment.bottomLeft,
-                    child: Text(g.$1, style: AppText.heading(size: 18)),
-                  ),
-                );
-              }).toList(),
+              children: _genres
+                  .map((g) => _GenreTile(
+                        label: g.$1,
+                        color: g.$2,
+                        onTap: () => sc.runQuery(g.$1),
+                      ))
+                  .toList(),
             );
           }),
         ),
       ],
     );
+  }
+}
+
+// ── Genre "Browse" tile ───────────────────────────────────────────────────────
+
+/// A Browse tile that shows real artwork behind its genre gradient. The
+/// gradient renders instantly (and stays as the fallback if art can't be
+/// resolved); a representative thumbnail for the genre fades in once fetched.
+class _GenreTile extends StatefulWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _GenreTile({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<_GenreTile> createState() => _GenreTileState();
+}
+
+class _GenreTileState extends State<_GenreTile> {
+  String? _art;
+
+  @override
+  void initState() {
+    super.initState();
+    _art = _GenreArt.cached(widget.label);
+    if (_art == null) {
+      _GenreArt.resolve(widget.label).then((url) {
+        if (mounted && url != null && url.isNotEmpty) {
+          setState(() => _art = url);
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Base genre gradient — the loading state and the fallback when no
+            // artwork is available.
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [widget.color, widget.color.withOpacity(0.4)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+            // Artwork (fades in when resolved).
+            if (_art != null)
+              CachedNetworkImage(
+                imageUrl: sizedThumb(_art!, ThumbnailSize.card),
+                fit: BoxFit.cover,
+                memCacheWidth: (260 * dpr).round(),
+                fadeInDuration: const Duration(milliseconds: 350),
+                errorWidget: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            // Genre-tinted scrim so the label stays legible over any artwork.
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    widget.color.withOpacity(0.30),
+                    Colors.black.withOpacity(0.62),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(widget.label, style: AppText.heading(size: 18)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Resolves + caches a representative thumbnail per genre. The first song
+/// result for the genre term supplies the art; results are cached in-memory for
+/// the session and in `CacheBox` for 24h so the Browse grid doesn't re-fetch.
+class _GenreArt {
+  static const _ttlMs = 24 * 60 * 60 * 1000; // 24h
+  static final Map<String, String> _mem = {};
+  static Box get _box => Hive.box('CacheBox');
+
+  static String _key(String genre) => 'genreArt:$genre';
+
+  /// A cached URL if present and fresh; null otherwise (triggers a fetch).
+  static String? cached(String genre) {
+    final m = _mem[genre];
+    if (m != null) return m;
+    final raw = _box.get(_key(genre)) as String?;
+    if (raw == null) return null;
+    try {
+      final wrapper = jsonDecode(raw) as Map<String, dynamic>;
+      final ts = wrapper['ts'] as int? ?? 0;
+      if (DateTime.now().millisecondsSinceEpoch - ts > _ttlMs) return null;
+      final url = wrapper['url'] as String?;
+      if (url != null && url.isNotEmpty) _mem[genre] = url;
+      return url;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String?> resolve(String genre) async {
+    final hit = cached(genre);
+    if (hit != null) return hit;
+    try {
+      final res = await SearchService.autocomplete(genre);
+      final url = res.isNotEmpty ? res.first.thumbnail : null;
+      if (url != null && url.isNotEmpty) {
+        _mem[genre] = url;
+        _box.put(
+            _key(genre),
+            jsonEncode({
+              'url': url,
+              'ts': DateTime.now().millisecondsSinceEpoch,
+            }));
+      }
+      return url;
+    } catch (_) {
+      return null; // offline / parse failure → tile keeps its gradient
+    }
   }
 }

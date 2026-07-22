@@ -1,7 +1,7 @@
 name: saragama
 description: A modern, minimal YouTube audio player.
 publish_to: 'none'
-version: 1.4.0
+version: 1.4.2
 
 environment:
   sdk: ">=3.1.5 <4.0.0"
@@ -38,6 +38,9 @@ dependencies:
   # Networking
   http: ^1.2.1
   path_provider: ^2.1.1
+  # App version for the anonymous heartbeat (already in the lockfile
+  # transitively; promoted so it can be imported directly).
+  package_info_plus: ^9.0.1
 
   # UI
   google_fonts: ^6.1.0

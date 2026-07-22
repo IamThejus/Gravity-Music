@@ -6,7 +6,7 @@
 
 A free and open-source music player with dynamic album-driven visuals, a floating glassmorphism UI, personalized on-device discovery, and playlists — built with Flutter and streaming from YouTube. Runs on Android (primary target) and Linux/Windows desktop.
 
-**No ads. No trackers. No accounts. No paywalls.** Every feature is available to everyone, forever — there is no paid tier and nothing is held back. Personalization (mixes, recommendations, taste profile) is computed entirely **on your device**; there is no backend server collecting your listening data. Cloud sync is optional and opt-in.
+**No ads. No trackers. No accounts. No paywalls.** Every feature is available to everyone, forever — there is no paid tier and nothing is held back. Personalization (mixes, recommendations, taste profile) is computed entirely **on your device**; there is no backend server collecting your listening data. Cloud sync is optional and opt-in. The only thing the app ever reports is an anonymous, aggregate usage heartbeat — a random ID, platform, and app version, nothing more — fully documented in [Privacy & Anonymous Usage Stats](#privacy--anonymous-usage-stats).
 
 
 <img src="media/banner.png" alt="Gravity Music Banner" />
@@ -92,6 +92,24 @@ Grab the latest build for your platform from the [**Releases**](https://github.c
 - **Offline-friendly caching** — resolved stream URLs, song downloads, home/playlist/album data are cached locally
 - **Cloud sync (optional)** — sign in with Google to back up and sync your liked songs and playlists across devices via Supabase; the app remains fully offline and account-free unless you opt in
 
+## Privacy & Anonymous Usage Stats
+
+Gravity Music collects **no personal data**. There are no analytics SDKs, no trackers, and no account requirement — personalization runs entirely on your device.
+
+To power the two public counters on the website (🎧 *listening now* / 📱 *installations*), the app sends a tiny anonymous **heartbeat** to a self-hosted [Cloudflare Worker](https://workers.cloudflare.com/) — **only while music is actually playing**, once per minute. Nothing is sent on app open, browsing, searching, or while paused.
+
+Each heartbeat contains exactly three fields:
+
+| Field | Example | Why |
+|---|---|---|
+| `installation_id` | random UUID v4 | counts each install once — generated on-device from secure random, tied to nothing |
+| `platform` | `android` | per-platform counts |
+| `app_version` | `1.4.0` | version adoption |
+
+**What is never collected:** songs, artists, playlists, listening or search history, user identity, emails, device identifiers (Android ID, IMEI, MAC address, advertising ID, serial number), or location. IP addresses are not persisted. The random ID cannot be traced back to you or your device — it isn't derived from anything — and clearing the app's data simply generates a new one.
+
+The backend stores only: the anonymous ID, platform, app version, and first-seen / last-heartbeat timestamps. The entire client implementation is ~150 lines of open, auditable code: [`lib/services/heartbeat_service.dart`](lib/services/heartbeat_service.dart).
+
 ## Keyboard Shortcuts (desktop)
 
 Shortcuts work on every screen. They're automatically disabled while you're typing in the search field, so `Space` still types a space.
@@ -120,6 +138,7 @@ Shortcuts work on every screen. They're automatically disabled while you're typi
 - [palette_generator](https://pub.dev/packages/palette_generator) — dynamic color extraction from album art
 - [lrclib.net](https://lrclib.net) — synced lyrics
 - [supabase_flutter](https://pub.dev/packages/supabase_flutter) + [google_sign_in](https://pub.dev/packages/google_sign_in) — optional cloud sync and Google authentication
+- [Cloudflare Workers](https://workers.cloudflare.com) — anonymous listener/installation counters for the website (random ID + platform + version only; see [Privacy & Anonymous Usage Stats](#privacy--anonymous-usage-stats))
 
 ## Getting Started
 

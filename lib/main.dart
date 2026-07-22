@@ -17,6 +17,7 @@ import 'controllers/player_controller.dart';
 import 'controllers/playlist_download_controller.dart';
 import 'services/audio_handler.dart';
 import 'services/battery_optimization.dart';
+import 'services/heartbeat_service.dart';
 import 'ui/app_theme.dart';
 import 'ui/shell/app_shortcuts.dart';
 import 'ui/shell/root_shell.dart';
@@ -98,6 +99,11 @@ void main() async {
   // Background playlist offline downloads (separate from the per-track
   // Downloads tab; drives the tile download badges).
   Get.put(PlaylistDownloadController());
+
+  // Anonymous "listening now" heartbeat for the website stats. Sends only a
+  // random UUID + platform + app version, and only while music is actively
+  // playing (observes PlayerController.buttonState — no extra listeners).
+  Get.put(HeartbeatService());
 
 // Listen to song changes and auto-fetch lyrics
 ever(Get.find<PlayerController>().currentSong, (song) {

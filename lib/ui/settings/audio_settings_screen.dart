@@ -108,13 +108,19 @@ class _EqualizerSection extends StatelessWidget {
             height: 40,
             child: Obx(() {
               final names = kEqPresets.keys.toList();
+              // Read the observable SYNCHRONOUSLY here, not inside itemBuilder.
+              // ListView calls itemBuilder lazily, so a read in there happens
+              // after this closure returns and Obx tracks nothing — GetX then
+              // throws ObxError, which a release build renders as a blank grey
+              // box. (Same trap as the lyrics list: lazy builders don't count.)
+              final current = eq.preset.value;
               return ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: names.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (_, i) {
                   final name = names[i];
-                  final selected = eq.preset.value == name;
+                  final selected = current == name;
                   return ChoiceChip(
                     label: Text(name),
                     selected: selected,

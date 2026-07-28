@@ -101,8 +101,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       _engine.isPlayingUsingLockCachingSource;
   bool get loudnessNormalizationEnabled =>
       _engine.loudnessNormalizationEnabled;
-  set loudnessNormalizationEnabled(bool v) =>
-      _engine.loudnessNormalizationEnabled = v;
 
   MyAudioHandler() {
     _engine = PlaybackEngine(
@@ -119,8 +117,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     loopModeEnabled = prefs.get('loopMode') ?? false;
     _queueMgr.shuffleEnabled = prefs.get('shuffleMode') ?? false;
     _queueMgr.queueLoopEnabled = prefs.get('queueLoopMode') ?? false;
-    _engine.loudnessNormalizationEnabled =
-        prefs.get('loudnessNormalization') ?? false;
+    // Safe here: _engine.init() (above) has already constructed the player.
+    _engine.setNormalizationEnabled(prefs.get('loudnessNormalization') ?? false);
 
     // Fire-and-forget. Until this resolves, the engine's createSource()
     // sees an empty cacheDir and falls back to plain URI sources. By the
@@ -661,9 +659,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         playbackState
             .add(playbackState.value.copyWith(queueIndex: currentIndex));
 
-        if (_engine.loudnessNormalizationEnabled) {
-          _engine.normalizeVolume(streamInfo.audio!.loudnessDb);
-        }
+        // Unconditional: the engine stores loudness even when normalization
+        // is off, so toggling it mid-track applies the right gain at once.
+        _engine.applyLoudness(streamInfo.audio!.loudnessDb);
 
         await _engine.player.play();
         _engine.setPhase(PlaybackPhase.playing,
@@ -714,9 +712,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         _engine.setPhase(PlaybackPhase.ready,
             reason: 'setSourceNPlay source ready');
 
-        if (_engine.loudnessNormalizationEnabled) {
-          _engine.normalizeVolume(streamInfo.audio!.loudnessDb);
-        }
+        // Unconditional: the engine stores loudness even when normalization
+        // is off, so toggling it mid-track applies the right gain at once.
+        _engine.applyLoudness(streamInfo.audio!.loudnessDb);
 
         await _engine.player.play();
         _engine.setPhase(PlaybackPhase.playing,
@@ -782,12 +780,10 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
       // ── Toggle loudness normalisation ───────────────────────────────────
       case 'toggleLoudnessNormalization':
-        _engine.loudnessNormalizationEnabled = extras!['enable'] as bool;
+        // Disabling reapplies the USER's volume; it must not jump to 100%.
+        _engine.setNormalizationEnabled(extras!['enable'] as bool);
         Hive.box('AppPrefs').put(
             'loudnessNormalization', _engine.loudnessNormalizationEnabled);
-        if (!_engine.loudnessNormalizationEnabled) {
-          _engine.player.setVolume(1.0);
-        }
         break;
 
       // ── Toggle queue loop ───────────────────────────────────────────────
@@ -798,7 +794,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
       // ── Set volume (0–100) ──────────────────────────────────────────────
       case 'setVolume':
-        _engine.player.setVolume((extras!['value'] as int) / 100);
+        // Slider is 0..100; the engine folds in the normalization gain.
+        _engine.setUserVolume((extras!['value'] as num).toDouble());
         break;
 
       // ── Reload current track at the newly-selected quality ──────────────
@@ -838,9 +835,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         currentSongUrl = item.extras!['url'] = streamInfo.audio!.url;
         await _engine.loadCurrent(_engine.createSource(item));
         await _engine.player.seek(pos);
-        if (_engine.loudnessNormalizationEnabled) {
-          _engine.normalizeVolume(streamInfo.audio!.loudnessDb);
-        }
+        // Unconditional: the engine stores loudness even when normalization
+        // is off, so toggling it mid-track applies the right gain at once.
+        _engine.applyLoudness(streamInfo.audio!.loudnessDb);
         if (wasPlaying) await _engine.player.play();
         break;
 
@@ -945,9 +942,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           processingState: AudioProcessingState.ready,
         ));
 
-        if (_engine.loudnessNormalizationEnabled) {
-          _engine.normalizeVolume(streamInfo.audio!.loudnessDb);
-        }
+        // Unconditional: the engine stores loudness even when normalization
+        // is off, so toggling it mid-track applies the right gain at once.
+        _engine.applyLoudness(streamInfo.audio!.loudnessDb);
 
         await _engine.player.play();
         _engine.setPhase(PlaybackPhase.playing,
@@ -1007,9 +1004,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           processingState: AudioProcessingState.ready,
         ));
 
-        if (_engine.loudnessNormalizationEnabled) {
-          _engine.normalizeVolume(shuffleStream.audio!.loudnessDb);
-        }
+        // Unconditional: the engine stores loudness even when normalization
+        // is off, so toggling it mid-track applies the right gain at once.
+        _engine.applyLoudness(shuffleStream.audio!.loudnessDb);
 
         await _engine.player.play();
         _engine.setPhase(PlaybackPhase.playing,

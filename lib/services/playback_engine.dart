@@ -15,12 +15,12 @@
 
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../util/log.dart';
+import 'volume_mixer.dart';
 
 // ── Playback state machine ──────────────────────────────────────────────────
 // Single source of truth for "what is the player doing right now?"
@@ -108,9 +108,22 @@ class PlaybackEngine {
   /// Used by call sites that need to know if the disk cache is engaged.
   bool isPlayingUsingLockCachingSource = false;
 
-  /// When on, volumes are adjusted per-track using the loudnessDb from
-  /// HMStreamingData so quiet/loud tracks render at similar levels.
-  bool loudnessNormalizationEnabled = false;
+  /// When on, per-track gain is applied from the loudnessDb in
+  /// HMStreamingData so tracks render at similar levels. Mutate only via
+  /// [setNormalizationEnabled] so the change is actually applied to the
+  /// player — a bare field assignment would silently do nothing.
+  bool _normalizationEnabled = false;
+  bool get loudnessNormalizationEnabled => _normalizationEnabled;
+
+  /// The user's volume slider position, 0..100. Combined multiplicatively
+  /// with the normalization gain (see volume_mixer.dart) rather than
+  /// overwriting it.
+  double _userVolume = 100.0;
+
+  /// The current track's loudnessDb (0.0 = unknown). Stored unconditionally
+  /// on every track start so toggling normalization mid-track can apply the
+  /// correct gain immediately.
+  double _currentLoudnessDb = 0.0;
 
   /// Periodic sync-read of player.position. Catches the "just_audio stalls
   /// at dur-1s without ever emitting completed or further position updates"
@@ -221,12 +234,35 @@ class PlaybackEngine {
     return AudioSource.uri(Uri.parse(url), tag: item);
   }
 
-  /// Set volume according to a loudness target of -5 dBFS, given the
-  /// track's measured loudnessDb. Formula: vol = 10^((-5 - loudnessDb)/20).
-  void normalizeVolume(double loudnessDb) {
-    final diff = -5.0 - loudnessDb;
-    final vol = pow(10.0, diff / 20.0).toDouble().clamp(0.0, 1.0);
-    player.setVolume(vol);
+  /// The ONLY place that calls player.setVolume(). Every input that affects
+  /// output level routes through here, so the user's slider and the
+  /// normalization gain combine instead of clobbering one another.
+  void _applyVolume() {
+    player.setVolume(effectiveVolume(
+      userVolume: _userVolume,
+      loudnessDb: _currentLoudnessDb,
+      normalize: _normalizationEnabled,
+    ));
+  }
+
+  /// Set the user's slider position (0..100) and reapply.
+  void setUserVolume(double v) {
+    _userVolume = v.clamp(0.0, 100.0);
+    _applyVolume();
+  }
+
+  /// Record the current track's loudness and reapply. Call on every track
+  /// start regardless of whether normalization is currently enabled.
+  void applyLoudness(double db) {
+    _currentLoudnessDb = db;
+    _applyVolume();
+  }
+
+  /// Enable/disable loudness normalization and reapply. Disabling restores
+  /// the user's own volume level — it must NOT jump to 100%.
+  void setNormalizationEnabled(bool v) {
+    _normalizationEnabled = v;
+    _applyVolume();
   }
 
   /// End-of-track detection. Two triggers, de-duplicated by the phase guard

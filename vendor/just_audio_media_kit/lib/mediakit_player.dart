@@ -15,6 +15,11 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   /// `package:media_kit`'s [Player]
   late final Player _player;
 
+  /// GRAVITY PATCH: the most recently constructed player, so the app can reach
+  /// mpv to apply audio filters at runtime. The app owns exactly one
+  /// AudioPlayer, so "most recent" is unambiguous in practice.
+  static Player? _activePlayer;
+
   /// The subscriptions that have to be disposed
   late final List<StreamSubscription> _streamSubscriptions;
 
@@ -50,6 +55,26 @@ class MediaKitPlayer extends AudioPlayerPlatform {
     return medias[_player.state.playlist.index];
   }
 
+  /// GRAVITY PATCH: set an mpv property on the active player.
+  ///
+  /// Returns false when no player exists yet (e.g. before playback has ever
+  /// started) or when the underlying call fails. Failures are logged and
+  /// reported, never rethrown: this is used for best-effort audio effects, and
+  /// an effects failure must degrade to "no effect", never break playback.
+  static Future<bool> setActivePlayerProperty(String key, dynamic value) async {
+    final player = _activePlayer;
+    if (player == null) return false;
+    try {
+      await setProperty(player, key, value);
+      return true;
+    } catch (e) {
+      // Logged, not swallowed silently — but deliberately not rethrown, so a
+      // failed effect can never take playback down with it.
+      _logger.warning('setActivePlayerProperty($key) failed: $e');
+      return false;
+    }
+  }
+
   MediaKitPlayer(super.id) {
     _player = Player(
         configuration: PlayerConfiguration(
@@ -71,6 +96,10 @@ class MediaKitPlayer extends AudioPlayerPlatform {
     // seek(0) fail so playback never produces audio. The in-memory demuxer
     // cache (bufferSize) is fine for audio, so force on-disk caching off.
     setProperty(_player, 'cache-on-disk', 'no');
+
+    // GRAVITY PATCH: publish this player so AudioEffects can set mpv
+    // properties (e.g. the `af` equalizer chain) at runtime.
+    _activePlayer = _player;
 
     _streamSubscriptions = [
       _player.stream.duration.listen((duration) {
@@ -399,6 +428,8 @@ class MediaKitPlayer extends AudioPlayerPlatform {
     _logger.info('releasing player resources');
     _mediaOpened = false;
     await _player.dispose();
+    // GRAVITY PATCH: stop publishing a disposed player.
+    if (identical(_activePlayer, _player)) _activePlayer = null;
     // cancel all stream subscriptions
     for (final StreamSubscription subscription in _streamSubscriptions) {
       unawaited(subscription.cancel());

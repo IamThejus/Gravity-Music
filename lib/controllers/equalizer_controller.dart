@@ -48,9 +48,10 @@ class EqualizerController extends GetxController {
     if (stored is List && stored.length == kEqFrequencies.length) {
       final parsed = <double>[];
       for (final v in stored) {
-        parsed.add(v is num
-            ? v.toDouble().clamp(kEqMinGain, kEqMaxGain).toDouble()
-            : 0.0);
+        // NaN survives clamp() (every NaN comparison is false), so screen it
+        // out explicitly — a NaN gain would poison the generated filter string.
+        final d = v is num ? v.toDouble() : double.nan;
+        parsed.add(d.isFinite ? d.clamp(kEqMinGain, kEqMaxGain).toDouble() : 0.0);
       }
       bands.assignAll(parsed);
     }
@@ -73,9 +74,16 @@ class EqualizerController extends GetxController {
     await AudioEffects.applyEqualizer(chain);
   }
 
+  /// Coalesce BOTH the Hive write and the mpv apply behind the debounce.
+  /// Persisting per drag frame would fire dozens of Box.put calls a second —
+  /// the same write-storm this project already had to fix for the volume
+  /// slider. Losing <150ms of drag on a hard kill is the accepted trade.
   void _scheduleApply() {
     _applyTimer?.cancel();
-    _applyTimer = Timer(_debounce, _applyNow);
+    _applyTimer = Timer(_debounce, () {
+      _persist();
+      _applyNow();
+    });
   }
 
   /// Re-assert the current chain. Called on track change: at boot the mpv
@@ -93,8 +101,7 @@ class EqualizerController extends GetxController {
     if (index < 0 || index >= bands.length) return;
     bands[index] = gain.clamp(kEqMinGain, kEqMaxGain).toDouble();
     preset.value = 'Custom'; // hand-tuning leaves the named preset
-    _persist();
-    _scheduleApply();
+    _scheduleApply(); // persists AND applies once the drag settles
   }
 
   void applyPreset(String name) {

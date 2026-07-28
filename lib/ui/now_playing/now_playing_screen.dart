@@ -19,6 +19,7 @@ import '../../controllers/player_controller.dart';
 import '../../services/library_service.dart';
 import '../../services/thumb_util.dart';
 import '../app_theme.dart';
+import '../settings/audio_settings_screen.dart';
 import '../theme/dynamic_color_controller.dart';
 import '../theme/glass.dart';
 import '../theme/motion.dart';
@@ -690,6 +691,10 @@ class _SecondaryBar extends StatelessWidget {
               snackPosition: SnackPosition.BOTTOM,
               backgroundColor: AppColors.card,
               colorText: Colors.white),
+        ),
+        GlassIconButton(
+          icon: Icons.tune_rounded,
+          onTap: () => Get.to(() => const AudioSettingsScreen()),
         ),
         GlassIconButton(
           icon: Icons.queue_music_rounded,

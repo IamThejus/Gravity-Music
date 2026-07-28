@@ -48,4 +48,18 @@ void main() {
       }
     }
   });
+
+  test('out-of-range userVolume (corrupt/hand-edited Hive data) still clamps '
+      'to 0..1', () {
+    for (final normalize in [true, false]) {
+      expect(
+        effectiveVolume(userVolume: 150, loudnessDb: 7.14, normalize: normalize),
+        inInclusiveRange(0.0, 1.0),
+      );
+      expect(
+        effectiveVolume(userVolume: -10, loudnessDb: 7.14, normalize: normalize),
+        inInclusiveRange(0.0, 1.0),
+      );
+    }
+  });
 }

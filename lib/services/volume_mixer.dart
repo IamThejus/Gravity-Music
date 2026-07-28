@@ -21,8 +21,8 @@ import 'dart:math';
 ///
 /// [loudnessDb] is YouTube's per-track figure: a POSITIVE value means the
 /// content sits that many dB above YouTube's reference level, so the
-/// corrective gain is -loudnessDb — exactly what YouTube's own player
-/// applies. Pass 0.0 when unknown (no attenuation).
+/// corrective gain is -loudnessDb — the same corrective direction that
+/// YouTube's own player applies. Pass 0.0 when unknown (no attenuation).
 ///
 /// [normalize] mirrors the loudness-normalization preference.
 ///

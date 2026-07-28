@@ -99,8 +99,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   bool get isSongLoading => _engine.isSongLoading;
   bool get isPlayingUsingLockCachingSource =>
       _engine.isPlayingUsingLockCachingSource;
-  bool get loudnessNormalizationEnabled =>
-      _engine.loudnessNormalizationEnabled;
 
   MyAudioHandler() {
     _engine = PlaybackEngine(

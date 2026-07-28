@@ -121,8 +121,10 @@ class PlaybackEngine {
   double _userVolume = 100.0;
 
   /// The current track's loudnessDb (0.0 = unknown). Stored unconditionally
-  /// on every track start so toggling normalization mid-track can apply the
-  /// correct gain immediately.
+  /// on every normal track start so toggling normalization mid-track can apply
+  /// the correct gain immediately. Note: restoreSession and the error branches
+  /// in audio_handler.dart do not call applyLoudness, so this can lag behind
+  /// the actually-loaded track in those paths (deliberately deferred).
   double _currentLoudnessDb = 0.0;
 
   /// Periodic sync-read of player.position. Catches the "just_audio stalls
@@ -234,9 +236,10 @@ class PlaybackEngine {
     return AudioSource.uri(Uri.parse(url), tag: item);
   }
 
-  /// The ONLY place that calls player.setVolume(). Every input that affects
-  /// output level routes through here, so the user's slider and the
-  /// normalization gain combine instead of clobbering one another.
+  /// The only place *in this codebase* that calls player.setVolume() (just_audio's
+  /// own interruption/ducking handling can still write volume independently).
+  /// Every input this codebase controls routes through here, so the user's
+  /// slider and the normalization gain combine instead of clobbering one another.
   void _applyVolume() {
     player.setVolume(effectiveVolume(
       userVolume: _userVolume,

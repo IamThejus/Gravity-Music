@@ -1,5 +1,6 @@
 // controllers/player_controller.dart
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:audio_service/audio_service.dart';
 import 'package:get/get.dart';
 import 'package:hive/hive.dart';
@@ -45,9 +46,23 @@ class PlayerController extends GetxController {
   final searchHistory      = <LibraryTrack>[].obs;
   final volume             = 100.0.obs;
 
+  /// True on desktop platforms, where the in-app volume slider is shown and
+  /// hardware-keyboard volume shortcuts are meaningful. On Android/iOS there
+  /// is no volume UI, so the user volume must never be read from or written
+  /// to Hive — otherwise a hardware keyboard/D-pad ArrowDown could silently
+  /// lower playback volume forever with no in-app way to raise it back.
+  final bool _isDesktop =
+      Platform.isLinux || Platform.isWindows || Platform.isMacOS;
+
   /// Sleep timer: when set, the time at which playback auto-pauses (null = off).
   final sleepTimerEnd      = Rxn<DateTime>();
   Timer? _sleepTimer;
+
+  /// Debounces the Hive write in [setVolume] — bound directly to
+  /// Slider.onChanged, a single drag can fire 100+ times, so only the
+  /// settled value is persisted. The audioHandler push and volume.value
+  /// update stay synchronous; only the disk write is delayed.
+  Timer? _volumeSaveTimer;
 
   /// Watermark-driven queue refill. Created in onInit, stopped in onClose.
   late final AutoplayOrchestrator _autoplay;
@@ -93,9 +108,13 @@ class PlayerController extends GetxController {
     cacheSongs.value = Hive.box('AppPrefs').get('cacheSongs') ?? false;
 
     // Restore the saved slider position and push it to the engine, so
-    // playback starts at the user's level instead of always 100%.
-    final savedVolume = Hive.box('AppPrefs').get('userVolume');
-    if (savedVolume is num) setVolume(savedVolume.toDouble());
+    // playback starts at the user's level instead of always 100%. Desktop
+    // only — non-desktop platforms have no volume UI and must stay at the
+    // 100.0 default (see _isDesktop).
+    if (_isDesktop) {
+      final savedVolume = Hive.box('AppPrefs').get('userVolume');
+      if (savedVolume is num) setVolume(savedVolume.toDouble());
+    }
 
     // Watermark-driven autoplay refill. Started AFTER the queue listeners
     // above so its own queue listener sees the same events. The callback
@@ -123,6 +142,7 @@ class PlayerController extends GetxController {
   void onClose() {
     _autoplay.stop();
     _sleepTimer?.cancel();
+    _volumeSaveTimer?.cancel();
     super.onClose();
   }
 
@@ -212,10 +232,20 @@ class PlayerController extends GetxController {
   // ── Volume ────────────────────────────────────────────────────────────────
 
   void setVolume(double v) {
-    volume.value = v.clamp(0, 100);
-    // Persist so the level survives a restart (it used to reset to 100%).
-    Hive.box('AppPrefs').put('userVolume', volume.value);
+    // Double literal bounds — num.clamp returns whichever limit it hits, so
+    // int bounds here would hand RxDouble.value an int and crash it.
+    volume.value = v.clamp(0.0, 100.0);
     audioHandler.customAction('setVolume', {'value': volume.value.round()});
+
+    // Persist so the level survives a restart (it used to reset to 100%).
+    // Desktop only — see _isDesktop. Debounced: this is bound directly to
+    // Slider.onChanged, so a single drag can fire 100+ times/sec; only the
+    // settled value needs to reach disk.
+    if (!_isDesktop) return;
+    _volumeSaveTimer?.cancel();
+    _volumeSaveTimer = Timer(const Duration(milliseconds: 400), () {
+      Hive.box('AppPrefs').put('userVolume', volume.value);
+    });
   }
 
   // ── Sleep timer ───────────────────────────────────────────────────────────

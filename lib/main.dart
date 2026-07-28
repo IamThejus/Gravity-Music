@@ -11,6 +11,7 @@ import 'services/app_paths.dart';
 import 'services/cloud/auth_service.dart';
 import 'services/cloud/sync_service.dart';
 import 'controllers/download_controller.dart';
+import 'controllers/equalizer_controller.dart';
 import 'controllers/import_controller.dart';
 import 'controllers/lyrics_controller.dart';
 import 'controllers/player_controller.dart';
@@ -86,6 +87,10 @@ void main() async {
   Get.put(PlayerController(audioHandler: audioHandler));
   final lyricsController = Get.put(LyricsController());
 
+  // Equalizer state + persistence. Registered after the audio handler so the
+  // first apply has a player to talk to where one already exists.
+  final equalizerController = Get.put(EqualizerController());
+
   // Drives the artwork → accent/base color theming used across the UI.
   Get.put(DynamicColorController());
 
@@ -116,6 +121,12 @@ ever(Get.find<PlayerController>().currentSong, (song) {
     );
   }
 });
+
+// mpv keeps `af` across tracks, but at cold start the player may not exist
+// when the equalizer first applies. Re-asserting on each track change makes
+// the chain land regardless of startup ordering.
+ever(Get.find<PlayerController>().currentSong,
+    (_) => equalizerController.reapply());
 
   runApp(const YTPlayerApp());
 

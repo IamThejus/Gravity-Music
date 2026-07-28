@@ -8,6 +8,19 @@
 // `equalizer` filter. Verified against mpv 0.41.0: a comma-chained lavfi graph
 // applies at runtime via `set_property af` without stalling playback, and an
 // empty string removes the filter from the path entirely.
+//
+// IMPORTANT — `af` is not exclusively ours. media_kit's MediaKitPlayer runs
+// with `pitch: true`, so just_audio's setSpeed/setPitch calls make it write
+// `af = 'scaletempo:scale=1.00000000'` (scaletempo is how it implements
+// tempo/pitch changes). AudioEffects.applyEqualizer overwrites the whole `af`
+// property, so pushing our chain removes any scaletempo filter media_kit put
+// there, and our own bypass (`af = ''`) removes it too. Today this is benign:
+// nothing in lib/ calls setSpeed/setPitch, and even when media_kit sets
+// scaletempo itself scale is always 1.0 (a passthrough). But if this app ever
+// adds playback-speed control, the two writers will need to compose a single
+// `af` value (e.g. our equalizer bands + scaletempo chained together) instead
+// of each unconditionally overwriting the property — a naive last-write-wins
+// implementation will silently drop one effect or the other.
 
 /// Standard 10-band ISO centre frequencies, in Hz.
 const List<int> kEqFrequencies = <int>[
@@ -51,11 +64,16 @@ String buildEqualizerChain(List<double> bands, {required bool enabled}) {
       bands.length < kEqFrequencies.length ? bands.length : kEqFrequencies.length;
   for (var i = 0; i < count; i++) {
     final gain = bands[i].clamp(kEqMinGain, kEqMaxGain).toDouble();
-    if (gain == 0.0) continue;
+    // Test the FORMATTED value, not the raw double: a gain like 0.04 rounds
+    // to "0.0" at one decimal place and must still be treated as flat, or a
+    // rounding artifact would emit a no-op g=0.0 (or g=-0.0) node and defeat
+    // the "flat bands emit nothing" intent.
+    final gainStr = gain.toStringAsFixed(1);
+    if (gainStr == '0.0' || gainStr == '-0.0') continue;
     parts.add('equalizer=f=${kEqFrequencies[i]}'
         ':t=q'
         ':w=${_kBandWidth.toStringAsFixed(1)}'
-        ':g=${gain.toStringAsFixed(1)}');
+        ':g=$gainStr');
   }
 
   if (parts.isEmpty) return '';

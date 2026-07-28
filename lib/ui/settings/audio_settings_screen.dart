@@ -58,7 +58,7 @@ class _NormalizationTileState extends State<_NormalizationTile> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: SwitchListTile(
         contentPadding: EdgeInsets.zero,
-        activeColor: AppColors.accent,
+        activeThumbColor: AppColors.accent,
         title: Text('Loudness normalization', style: AppText.title(size: 16)),
         subtitle: Text(
           'Even out volume differences between tracks',
@@ -96,7 +96,7 @@ class _EqualizerSection extends StatelessWidget {
                     child: Text('Equalizer', style: AppText.title(size: 16)),
                   ),
                   Switch(
-                    activeColor: AppColors.accent,
+                    activeThumbColor: AppColors.accent,
                     value: eq.enabled.value,
                     onChanged: eq.setEnabled,
                   ),

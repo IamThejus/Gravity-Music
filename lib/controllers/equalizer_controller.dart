@@ -35,7 +35,14 @@ class EqualizerController extends GetxController {
 
   @override
   void onClose() {
-    _applyTimer?.cancel();
+    // If a debounced apply is still pending, a slider moved <150ms before
+    // teardown would otherwise be silently lost (cancelled, never flushed).
+    // Persist it now — no need to also push it to the backend, the process
+    // is tearing down anyway.
+    if (_applyTimer?.isActive ?? false) {
+      _applyTimer?.cancel();
+      _persist();
+    }
     super.onClose();
   }
 
@@ -48,8 +55,11 @@ class EqualizerController extends GetxController {
     if (stored is List && stored.length == kEqFrequencies.length) {
       final parsed = <double>[];
       for (final v in stored) {
-        // NaN survives clamp() (every NaN comparison is false), so screen it
-        // out explicitly — a NaN gain would poison the generated filter string.
+        // Screen out non-finite values explicitly before clamp(): clamp()
+        // does NOT leave NaN as NaN — `double.nan.clamp(-12.0, 12.0)` returns
+        // 12.0 (the maximum), so an unguarded corrupt/NaN gain would silently
+        // become a full +12 dB boost rather than being neutralized. Falling
+        // back to 0.0 (flat) is the safe default for any non-finite value.
         final d = v is num ? v.toDouble() : double.nan;
         parsed.add(d.isFinite ? d.clamp(kEqMinGain, kEqMaxGain).toDouble() : 0.0);
       }

@@ -92,6 +92,11 @@ class PlayerController extends GetxController {
     qualityPref.value = readQualityPref();
     cacheSongs.value = Hive.box('AppPrefs').get('cacheSongs') ?? false;
 
+    // Restore the saved slider position and push it to the engine, so
+    // playback starts at the user's level instead of always 100%.
+    final savedVolume = Hive.box('AppPrefs').get('userVolume');
+    if (savedVolume is num) setVolume(savedVolume.toDouble());
+
     // Watermark-driven autoplay refill. Started AFTER the queue listeners
     // above so its own queue listener sees the same events. The callback
     // routes through addToQueue so QueueManager bookkeeping stays in sync.
@@ -208,6 +213,8 @@ class PlayerController extends GetxController {
 
   void setVolume(double v) {
     volume.value = v.clamp(0, 100);
+    // Persist so the level survives a restart (it used to reset to 100%).
+    Hive.box('AppPrefs').put('userVolume', volume.value);
     audioHandler.customAction('setVolume', {'value': volume.value.round()});
   }
 

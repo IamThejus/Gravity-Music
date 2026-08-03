@@ -137,47 +137,7 @@ class _PlayerBodyState extends State<_PlayerBody>
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.stackMd),
               child: Center(
-                child: Obx(() {
-                  final art = sizedThumb(
-                      pc.currentSong.value?.artUri?.toString(),
-                      ThumbnailSize.art);
-                  return AspectRatio(
-                    aspectRatio: 1,
-                    child: Hero(
-                      tag: kNowPlayingArtTag,
-                      // Match the mini-player Hero: straight-line morph (no arc)
-                      // so push and pop both expand/contract the art directly.
-                      createRectTween: (begin, end) =>
-                          RectTween(begin: begin, end: end),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(AppRadius.xl),
-                          boxShadow: const [
-                            BoxShadow(
-                                color: Color(0x66000000),
-                                blurRadius: 44,
-                                offset: Offset(0, 20)),
-                          ],
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: art.isEmpty
-                            ? Container(
-                                color: AppColors.card,
-                                child: const Icon(Icons.music_note_rounded,
-                                    size: 80, color: AppColors.textTertiary))
-                            : CachedNetworkImage(
-                                imageUrl: art,
-                                fit: BoxFit.cover,
-                                // Artwork is drawn at most ~screen-width; cap the
-                                // decode there instead of the source resolution.
-                                memCacheWidth: (MediaQuery.sizeOf(context).width *
-                                        MediaQuery.devicePixelRatioOf(context))
-                                    .round()
-                                    .clamp(1, 2048)),
-                      ),
-                    ),
-                  );
-                }),
+                child: _SwipeableArtwork(pc: pc),
               ),
             ),
           ),
@@ -239,6 +199,190 @@ class _PlayerBodyState extends State<_PlayerBody>
           const SizedBox(height: AppSpacing.gutter),
         ],
       ),
+    );
+  }
+}
+
+/// Apple-Music-style swipeable artwork: drag the cover LEFT → next track,
+/// RIGHT → previous. The art follows the finger (with a slight shrink/fade),
+/// then completes a carousel: the current cover slides off in the drag
+/// direction and the new track's cover slides in from the opposite edge. A
+/// short drag springs back. Navigation routes through the existing
+/// PlayerController.next/prev, so the queue / recommendations are untouched.
+///
+/// The incoming cover is driven by the PEEKED next/prev track (pc.peekNext /
+/// peekPrev), not the reactive currentSong — so the correct art shows the
+/// instant it slides in, instead of briefly flashing the outgoing cover while
+/// the player catches up. Neighbour images are precached on drag start.
+class _SwipeableArtwork extends StatefulWidget {
+  final PlayerController pc;
+  const _SwipeableArtwork({required this.pc});
+
+  @override
+  State<_SwipeableArtwork> createState() => _SwipeableArtworkState();
+}
+
+class _SwipeableArtworkState extends State<_SwipeableArtwork>
+    with SingleTickerProviderStateMixin {
+  // Live horizontal offset of the cover. A ValueNotifier (not setState) so each
+  // drag/animation frame repaints only the Transform layer, never the whole
+  // Now Playing tree.
+  final ValueNotifier<double> _dragX = ValueNotifier(0);
+  late final AnimationController _slide = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 240));
+  bool _busy = false; // a commit animation is running — ignore new drags
+
+  // While sliding a new track in, show ITS art directly (peeked ahead of the
+  // player) so we never flash the outgoing cover. Cleared once currentSong
+  // catches up (they then show the same image, so it's seamless).
+  String? _incomingArt;
+  String? _incomingId;
+
+  @override
+  void dispose() {
+    _slide.dispose();
+    _dragX.dispose();
+    super.dispose();
+  }
+
+  double get _travel => MediaQuery.sizeOf(context).width;
+
+  void _animate(double from, double to,
+      {Curve curve = Curves.easeOutCubic, VoidCallback? then}) {
+    _slide.reset();
+    final tween = Tween(begin: from, end: to)
+        .animate(CurvedAnimation(parent: _slide, curve: curve));
+    void tick() => _dragX.value = tween.value;
+    tween.addListener(tick);
+    _slide.forward().whenComplete(() {
+      tween.removeListener(tick);
+      then?.call();
+    });
+  }
+
+  String _artOf(MediaItem? item) =>
+      sizedThumb(item?.artUri?.toString(), ThumbnailSize.art);
+
+  void _precacheNeighbours() {
+    for (final item in [widget.pc.peekNext(), widget.pc.peekPrev()]) {
+      final url = _artOf(item);
+      if (url.isNotEmpty) {
+        precacheImage(CachedNetworkImageProvider(url), context)
+            .catchError((_) {});
+      }
+    }
+  }
+
+  void _commit(bool next) {
+    _busy = true;
+    final peeked = next ? widget.pc.peekNext() : widget.pc.peekPrev();
+    final w = _travel;
+    // Phase 1: slide the current cover fully off in the drag direction.
+    _animate(_dragX.value, next ? -w : w, curve: Curves.easeIn, then: () {
+      // Pin the incoming cover to the peeked track so it shows correct art
+      // immediately, then switch tracks and slide it in from the far edge.
+      if (peeked != null) {
+        _incomingArt = _artOf(peeked);
+        _incomingId = peeked.id;
+      }
+      next ? widget.pc.next() : widget.pc.prev();
+      _dragX.value = next ? w : -w;
+      _animate(_dragX.value, 0, then: () => _busy = false);
+    });
+  }
+
+  void _onDragEnd(DragEndDetails d) {
+    if (_busy) return;
+    final w = _travel;
+    final v = d.primaryVelocity ?? 0;
+    final x = _dragX.value;
+    final passed = x.abs() > w * 0.25;
+    // A fast fling wins on velocity; otherwise commit if dragged far enough.
+    if (v < -600 || (x < 0 && passed && v <= 0)) {
+      _commit(true); // swipe left → next
+    } else if (v > 600 || (x > 0 && passed && v >= 0)) {
+      _commit(false); // swipe right → previous
+    } else {
+      _animate(x, 0); // not enough — spring back
+    }
+  }
+
+  /// Builds the square Hero cover for [artUrl].
+  Widget _cover(String artUrl) {
+    return AspectRatio(
+      aspectRatio: 1,
+      child: Hero(
+        tag: kNowPlayingArtTag,
+        createRectTween: (begin, end) => RectTween(begin: begin, end: end),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x66000000),
+                  blurRadius: 44,
+                  offset: Offset(0, 20)),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: artUrl.isEmpty
+              ? Container(
+                  color: AppColors.card,
+                  child: const Icon(Icons.music_note_rounded,
+                      size: 80, color: AppColors.textTertiary))
+              : CachedNetworkImage(
+                  imageUrl: artUrl,
+                  fit: BoxFit.cover,
+                  memCacheWidth: (MediaQuery.sizeOf(context).width *
+                          MediaQuery.devicePixelRatioOf(context))
+                      .round()
+                      .clamp(1, 2048)),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pc = widget.pc;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragStart: (_) {
+        if (!_busy) {
+          _slide.stop();
+          _precacheNeighbours();
+        }
+      },
+      onHorizontalDragUpdate: (d) {
+        if (!_busy) _dragX.value += d.delta.dx;
+      },
+      onHorizontalDragEnd: _onDragEnd,
+      child: Obx(() {
+        final song = pc.currentSong.value;
+        final liveArt = _artOf(song);
+        // Once the player has switched to the track we slid in, drop the
+        // override (they now resolve to the same image — seamless).
+        if (_incomingId != null && song?.id == _incomingId) {
+          _incomingArt = null;
+          _incomingId = null;
+        }
+        return ValueListenableBuilder<double>(
+          valueListenable: _dragX,
+          builder: (context, dx, _) {
+            final w = MediaQuery.sizeOf(context).width;
+            final p = (dx.abs() / (w == 0 ? 1 : w)).clamp(0.0, 1.0);
+            return Transform.translate(
+              offset: Offset(dx, 0),
+              child: Transform.scale(
+                scale: 1 - p * 0.06,
+                child: Opacity(
+                    opacity: 1 - p * 0.30,
+                    child: _cover(_incomingArt ?? liveArt)),
+              ),
+            );
+          },
+        );
+      }),
     );
   }
 }

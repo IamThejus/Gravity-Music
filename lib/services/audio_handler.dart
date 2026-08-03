@@ -93,6 +93,22 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   List<String> get userQueuedIds => _queueMgr.userQueuedIds;
   bool isUserQueued(String id) => _queueMgr.isUserQueued(id);
 
+  /// The item that skipToNext / skipToPrevious would play, without any side
+  /// effects — used to preview neighbouring artwork. Null at the queue edges.
+  MediaItem? peekNextItem() {
+    final idx = _queueMgr.peekNextIndex(queue.value, currentIndex);
+    return (idx != null && idx >= 0 && idx < queue.value.length)
+        ? queue.value[idx]
+        : null;
+  }
+
+  MediaItem? peekPrevItem() {
+    final idx = _queueMgr.peekPrevIndex(queue.value, currentIndex);
+    return (idx != null && idx >= 0 && idx < queue.value.length)
+        ? queue.value[idx]
+        : null;
+  }
+
   // ── Playback engine ───────────────────────────────────────────────────
   // Owns the AudioPlayer, the ConcatenatingAudioSource, the PlaybackPhase
   // state machine, the auto-advance listener, and the source factory.

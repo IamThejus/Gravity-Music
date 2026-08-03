@@ -149,6 +149,19 @@ class QueueManager {
     return null;
   }
 
+  /// Non-mutating peek of the previous index (mirror of [prevIndex] without the
+  /// shuffle-cursor side effect). Used to preview the previous track's artwork.
+  int? peekPrevIndex(List<MediaItem> items, int currentIndex) {
+    if (shuffleEnabled) {
+      if (_shuffledIds.isEmpty || _shuffleIndex - 1 < 0) return null;
+      final id = _shuffledIds[_shuffleIndex - 1];
+      final idx = items.indexWhere((i) => i.id == id);
+      return idx == -1 ? null : idx;
+    }
+    if (currentIndex - 1 >= 0) return currentIndex - 1;
+    return null;
+  }
+
   /// Returns the index of the previous song, or null if at the start.
   ///
   /// Side effect (shuffle mode): decrements `_shuffleIndex`, wraps to

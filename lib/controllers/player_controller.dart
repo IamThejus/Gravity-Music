@@ -130,6 +130,15 @@ class PlayerController extends GetxController {
   void prev()  => audioHandler.skipToPrevious();
   void seek(Duration pos) => audioHandler.seek(pos);
 
+  /// The track that "next"/"previous" WOULD play, without changing anything —
+  /// used to preview the neighbouring artwork (Now Playing swipe carousel).
+  MediaItem? peekNext() => audioHandler is MyAudioHandler
+      ? (audioHandler as MyAudioHandler).peekNextItem()
+      : null;
+  MediaItem? peekPrev() => audioHandler is MyAudioHandler
+      ? (audioHandler as MyAudioHandler).peekPrevItem()
+      : null;
+
   void toggleLoop() {
     isLoopEnabled.value = !isLoopEnabled.value;
     audioHandler.setRepeatMode(

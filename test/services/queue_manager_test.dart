@@ -161,6 +161,15 @@ void main() {
       expect(h.qm.shuffledIds.contains('Y'), isFalse);
     });
 
+    test('peekPrevIndex previews the previous track without mutating', () {
+      final h = Harness()..playAll(['A', 'B', 'C'], start: 1); // cur B
+      final peek = h.qm.peekPrevIndex(h.queue, h.currentIndex);
+      expect(peek, 0); // A
+      // Non-mutating: shuffle cursor untouched (still not shuffled here).
+      expect(h.qm.shuffleIndex, 0);
+      expect(h.qm.peekPrevIndex(h.queue, 0), isNull); // nothing before first
+    });
+
     test('peekNextIndex also honours the user queue', () {
       final h = Harness()..playAll(['A', 'B', 'C'], start: 0);
       h.enableShuffle();

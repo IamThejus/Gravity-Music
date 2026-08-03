@@ -88,6 +88,11 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   bool get shuffleModeEnabled => _queueMgr.shuffleEnabled;
   bool get queueLoopModeEnabled => _queueMgr.queueLoopEnabled;
 
+  /// Ids of the pending user-queued songs (the "Next in queue" section), for
+  /// UI sectioning and session persistence.
+  List<String> get userQueuedIds => _queueMgr.userQueuedIds;
+  bool isUserQueued(String id) => _queueMgr.isUserQueued(id);
+
   // ── Playback engine ───────────────────────────────────────────────────
   // Owns the AudioPlayer, the ConcatenatingAudioSource, the PlaybackPhase
   // state machine, the auto-advance listener, and the source factory.
@@ -614,6 +619,10 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         final isNewUrl = extras['newUrl'] ?? false;
         final song = queue.value[currentIndex];
 
+        // A song became current — drop any user-queued items now behind it
+        // (played or skipped past), keeping the user section == pending run.
+        _queueMgr.pruneConsumed(queue.value, currentIndex);
+
         // Set phase BEFORE teardown awaits. _playList.clear() emits
         // ProcessingState.completed (just_audio treats an emptied
         // ConcatenatingAudioSource as "all consumed"). If we set phase
@@ -682,6 +691,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         await _engine.clearForReload();
         mediaItem.add(song);
         queue.add([song]);
+        _queueMgr.resetUserQueue(); // fresh single-song playback
 
         final streamInfo = await checkNGetUrl(song.id);
 
@@ -746,6 +756,29 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         _queueMgr.onItemInsertedAfterCurrent(song.id);
         break;
 
+      // ── User queue: "Add to queue" / "Play next" ────────────────────────
+      // Both add to the USER SECTION, which always plays right after the
+      // current song and ahead of the context/autoplay tail (and is exempt
+      // from shuffle — see QueueManager). "Add to queue" appends to the end of
+      // that section; "Play next" (playNext:true) inserts at its front.
+      case 'addToUserQueue':
+        final song = extras!['mediaItem'] as MediaItem;
+        final playNext = extras['playNext'] == true;
+        final q = queue.value;
+        // If it's already pending in the user section, pull its stale copy so
+        // the re-add moves it (matches QueueManager.onUserEnqueued's remove+add).
+        if (_queueMgr.isUserQueued(song.id)) {
+          final existing = q.indexWhere((m) => m.id == song.id);
+          if (existing > currentIndex) q.removeAt(existing);
+        }
+        final pos = playNext
+            ? (currentIndex + 1).clamp(0, q.length)
+            : _queueMgr.userQueueInsertIndex(q, currentIndex);
+        q.insert(pos, song);
+        queue.add(q);
+        _queueMgr.onUserEnqueued(song.id, front: playNext);
+        break;
+
       // ── Clear all but current ───────────────────────────────────────────
       case 'clearQueue':
         customAction('reorderQueue',
@@ -754,6 +787,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         q.removeRange(1, q.length);
         queue.add(q);
         _queueMgr.onClearedExceptCurrent(q.first.id);
+        _queueMgr.resetUserQueue();
         break;
 
       // ── Dismiss the player entirely ─────────────────────────────────────
@@ -773,6 +807,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         currentSongUrl = null;
         currentIndex = 0;
         queue.add([]);
+        _queueMgr.resetUserQueue();
         mediaItem.add(null);
         playbackState.add(playbackState.value.copyWith(
           processingState: AudioProcessingState.idle,
@@ -854,6 +889,11 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         // Rebuild queue without playing yet
         queue.add(items);
         currentIndex = restoreIndex;
+        // Restore the user section (ids still ahead of the restore point).
+        final restoredUserIds =
+            (extras['userQueue'] as List?)?.cast<String>() ?? const <String>[];
+        _queueMgr.restoreUserQueue(restoredUserIds);
+        _queueMgr.pruneConsumed(items, restoreIndex);
         mediaItem.add(items[restoreIndex]);
 
         _engine.setPhase(PlaybackPhase.loading,

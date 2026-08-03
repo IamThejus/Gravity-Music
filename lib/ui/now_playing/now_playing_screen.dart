@@ -24,6 +24,7 @@ import '../theme/glass.dart';
 import '../theme/motion.dart';
 import '../ui_helpers.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/track_actions.dart';
 
 const String kNowPlayingArtTag = 'np-art';
 
@@ -1023,6 +1024,14 @@ void showQueueSheet(BuildContext context) {
                                         .value)
                                 : null,
                             onTap: () => handler.skipToQueueItem(i),
+                            onLongPress: () => showTrackActionsSheet(
+                              context,
+                              videoId: item.id,
+                              title: item.title,
+                              artist: item.artist ?? '',
+                              thumbnail: item.artUri?.toString() ?? '',
+                              duration: item.duration,
+                            ),
                           );
                         },
                       );

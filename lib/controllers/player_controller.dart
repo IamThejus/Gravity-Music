@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:get/get.dart';
 import 'package:hive/hive.dart';
+import '../services/audio_handler.dart';
 import '../services/autoplay_orchestrator.dart';
 import '../services/library_service.dart';
 import '../services/listening_history_service.dart';
@@ -231,6 +232,24 @@ class PlayerController extends GetxController {
 
   // ── Core play methods ─────────────────────────────────────────────────────
 
+  /// Build the MediaItem the audio handler expects (hi-res art for the
+  /// notification; `extras.url` filled in lazily at play time).
+  MediaItem _mediaItemFor(
+    String videoId, {
+    String? title,
+    String? artist,
+    String? thumbnail,
+    Duration? duration,
+  }) =>
+      MediaItem(
+        id: videoId,
+        title: title ?? videoId,
+        artist: artist,
+        artUri: _hiResArt(thumbnail),
+        duration: duration,
+        extras: {'url': ''},
+      );
+
   Future<void> playVideoId(
     String videoId, {
     String? title,
@@ -239,17 +258,15 @@ class PlayerController extends GetxController {
     Duration? duration,
   }) async {
     errorMessage.value = null;
-    final song = MediaItem(
-      id: videoId,
-      title: title ?? videoId,
-      artist: artist,
-      artUri: _hiResArt(thumbnail),
-      duration: duration,
-      extras: {'url': ''},
-    );
-    await audioHandler.customAction('setSourceNPlay', {'mediaItem': song});
+    await audioHandler.customAction('setSourceNPlay', {
+      'mediaItem': _mediaItemFor(videoId,
+          title: title, artist: artist, thumbnail: thumbnail, duration: duration)
+    });
   }
 
+  /// Append to the AUTOPLAY tail (end of the queue). Used by the recommendation
+  /// engine (playWithRecommendations + AutoplayOrchestrator) — NOT the user's
+  /// "Add to queue" action, which is [addToUserQueue].
   Future<void> addToQueue(
     String videoId, {
     String? title,
@@ -257,15 +274,40 @@ class PlayerController extends GetxController {
     String? thumbnail,
     Duration? duration,
   }) async {
-    final song = MediaItem(
-      id: videoId,
-      title: title ?? videoId,
-      artist: artist,
-      artUri: _hiResArt(thumbnail),
-      duration: duration,
-      extras: {'url': ''},
-    );
-    await audioHandler.addQueueItem(song);
+    await audioHandler.addQueueItem(_mediaItemFor(videoId,
+        title: title, artist: artist, thumbnail: thumbnail, duration: duration));
+  }
+
+  /// User action "Add to queue": append to the end of the user queue — plays
+  /// after the current song and any already-queued songs, ahead of the rest of
+  /// the context/autoplay queue. Never interrupts the current track.
+  Future<void> addToUserQueue(
+    String videoId, {
+    String? title,
+    String? artist,
+    String? thumbnail,
+    Duration? duration,
+  }) async {
+    await audioHandler.customAction('addToUserQueue', {
+      'mediaItem': _mediaItemFor(videoId,
+          title: title, artist: artist, thumbnail: thumbnail, duration: duration)
+    });
+  }
+
+  /// User action "Play next": insert at the FRONT of the user queue so it plays
+  /// immediately after the current song. Never interrupts the current track.
+  Future<void> playNext(
+    String videoId, {
+    String? title,
+    String? artist,
+    String? thumbnail,
+    Duration? duration,
+  }) async {
+    await audioHandler.customAction('addToUserQueue', {
+      'mediaItem': _mediaItemFor(videoId,
+          title: title, artist: artist, thumbnail: thumbnail, duration: duration),
+      'playNext': true,
+    });
   }
 
   Future<void> playWithRecommendations(
@@ -372,6 +414,11 @@ class PlayerController extends GetxController {
       final idx = audioHandler.playbackState.value.queueIndex ?? 0;
       final pos = progressBarState.value.current.inMilliseconds;
       if (q.isEmpty) return;
+      // Persist the user-queue section so the Current → User → Context →
+      // Autoplay ordering (and correct future inserts) survives a restart.
+      final userQueue = audioHandler is MyAudioHandler
+          ? (audioHandler as MyAudioHandler).userQueuedIds
+          : const <String>[];
       Hive.box('AppPrefs').put('session', {
         'queue': q.map((m) => {
           'id':       m.id,
@@ -382,6 +429,7 @@ class PlayerController extends GetxController {
         }).toList(),
         'index': idx,
         'position': pos,
+        'userQueue': userQueue,
       });
     } catch (_) {}
   }
@@ -407,11 +455,14 @@ class PlayerController extends GetxController {
 
       final index = (saved['index'] as int? ?? 0).clamp(0, items.length - 1);
       final posMs = saved['position'] as int? ?? 0;
+      final userQueue =
+          (saved['userQueue'] as List?)?.cast<String>() ?? const <String>[];
 
       await audioHandler.customAction('restoreSession', {
         'items': items,
         'index': index,
         'positionMs': posMs,
+        'userQueue': userQueue,
       });
     } catch (_) {}
   }

@@ -86,6 +86,7 @@ class FadeThroughPageTransitionsBuilder extends PageTransitionsBuilder {
 class Pressable extends StatefulWidget {
   final Widget child;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final double pressedScale;
   final HitTestBehavior behavior;
   final bool haptic;
@@ -94,6 +95,7 @@ class Pressable extends StatefulWidget {
     super.key,
     required this.child,
     required this.onTap,
+    this.onLongPress,
     this.pressedScale = 0.96,
     this.behavior = HitTestBehavior.opaque,
     this.haptic = true,
@@ -121,6 +123,12 @@ class _PressableState extends State<Pressable> {
         if (widget.haptic) AppHaptics.light();
         widget.onTap();
       },
+      onLongPress: widget.onLongPress == null
+          ? null
+          : () {
+              if (widget.haptic) AppHaptics.medium();
+              widget.onLongPress!();
+            },
       child: AnimatedScale(
         scale: _down ? widget.pressedScale : 1.0,
         duration: AppMotion.fast,

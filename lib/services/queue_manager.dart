@@ -32,6 +32,72 @@ class QueueManager {
   List<String> get shuffledIds => List.unmodifiable(_shuffledIds);
   int get shuffleIndex => _shuffleIndex;
 
+  // ── User queue ───────────────────────────────────────────────────────
+  // Songs the user explicitly enqueued ("Add to queue" / "Play next"). They
+  // are a *marker set over the single flat queue*, not a second list — the
+  // ids here identify which of the flat-queue items belong to the user
+  // section. They always play immediately after the current song and, per
+  // the Spotify/Apple model, are EXEMPT FROM SHUFFLE (they play in insertion
+  // order even when shuffle is on). Because of that, user-queued ids are
+  // deliberately kept OUT of the shuffle permutation.
+  final List<String> _userQueuedIds = [];
+
+  /// Read-only view (persistence / UI sectioning) — do not mutate.
+  List<String> get userQueuedIds => List.unmodifiable(_userQueuedIds);
+  bool isUserQueued(String id) => _userQueuedIds.contains(id);
+
+  /// Flat-queue index where a new "Add to queue" item should be inserted:
+  /// after the current song AND after the contiguous run of already-queued
+  /// user items right after it — so successive adds keep their order and land
+  /// ahead of the context/autoplay tail.
+  int userQueueInsertIndex(List<MediaItem> items, int currentIndex) {
+    var pos = currentIndex + 1;
+    while (pos < items.length && _userQueuedIds.contains(items[pos].id)) {
+      pos++;
+    }
+    return pos.clamp(0, items.length);
+  }
+
+  /// Record a user-enqueued id. [front] = true for "Play next" (front of the
+  /// user section); default appends to the end of the user section. Re-adding
+  /// an existing id moves it (the handler removes its stale flat copy to match).
+  void onUserEnqueued(String id, {bool front = false}) {
+    _userQueuedIds.remove(id);
+    front ? _userQueuedIds.insert(0, id) : _userQueuedIds.add(id);
+  }
+
+  /// Drop user-queued ids that are no longer pending — played/skipped past
+  /// (flat index <= current) or gone from the queue. Keeps the user section
+  /// equal to the run of pending items strictly ahead of the current song.
+  void pruneConsumed(List<MediaItem> items, int currentIndex) {
+    _userQueuedIds.removeWhere((id) {
+      final idx = items.indexWhere((i) => i.id == id);
+      return idx == -1 || idx <= currentIndex;
+    });
+  }
+
+  /// Clear the user section (new queue / dismiss / clear-queue).
+  void resetUserQueue() => _userQueuedIds.clear();
+
+  /// Re-seed the user section from a restored session.
+  void restoreUserQueue(Iterable<String> ids) {
+    _userQueuedIds
+      ..clear()
+      ..addAll(ids);
+  }
+
+  /// Flat index of the nearest pending user-queued item after [currentIndex],
+  /// or null if none. This is what makes the user queue play next regardless
+  /// of shuffle.
+  int? _firstUserQueuedIndexAfter(List<MediaItem> items, int currentIndex) {
+    int? best;
+    for (final id in _userQueuedIds) {
+      final idx = items.indexWhere((i) => i.id == id);
+      if (idx > currentIndex && (best == null || idx < best)) best = idx;
+    }
+    return best;
+  }
+
   // ── Navigation ───────────────────────────────────────────────────────
 
   /// Returns the index of the next song in [items], or null if the queue
@@ -42,6 +108,10 @@ class QueueManager {
   /// Side effect: when shuffle is on, advances `_shuffleIndex` (and
   /// reshuffles + wraps if at the end of the permutation).
   int? nextIndex(List<MediaItem> items, int currentIndex) {
+    // User queue takes precedence and is exempt from shuffle — pending
+    // user-queued songs always play next, in insertion order.
+    final userNext = _firstUserQueuedIndexAfter(items, currentIndex);
+    if (userNext != null) return userNext;
     if (shuffleEnabled) {
       if (_shuffledIds.isEmpty) return null;
       if (_shuffleIndex + 1 >= _shuffledIds.length) {
@@ -64,6 +134,8 @@ class QueueManager {
   /// upcoming track's URL. Returns null at the end of the shuffle permutation
   /// (the real advance would reshuffle, so there's nothing stable to prefetch).
   int? peekNextIndex(List<MediaItem> items, int currentIndex) {
+    final userNext = _firstUserQueuedIndexAfter(items, currentIndex);
+    if (userNext != null) return userNext;
     if (shuffleEnabled) {
       if (_shuffledIds.isEmpty || _shuffleIndex + 1 >= _shuffledIds.length) {
         return null;
@@ -105,19 +177,25 @@ class QueueManager {
   /// randomized — so the current song keeps playing, then the rest play
   /// in random order.
   void enableShuffle(List<MediaItem> items, int fromIndex) {
-    if (items.isEmpty || fromIndex < 0 || fromIndex >= items.length) {
-      shuffleEnabled = true;
-      _shuffledIds = items.map((i) => i.id).toList();
-      _shuffleIndex = 0;
-      return;
+    shuffleEnabled = true;
+    // User-queued items stay OUT of the permutation (they're shuffle-exempt),
+    // so build the permutation from context/autoplay items only, keeping the
+    // current song pinned at position 0.
+    final currentId = (fromIndex >= 0 && fromIndex < items.length)
+        ? items[fromIndex].id
+        : null;
+    final ids = items
+        .map((i) => i.id)
+        .where((id) => !_userQueuedIds.contains(id))
+        .toList();
+    if (currentId != null && ids.remove(currentId)) {
+      ids.shuffle();
+      ids.insert(0, currentId);
+    } else {
+      ids.shuffle();
     }
-    final ids = items.map((i) => i.id).toList();
-    final current = ids.removeAt(fromIndex);
-    ids.shuffle();
-    ids.insert(0, current);
     _shuffledIds = ids;
     _shuffleIndex = 0;
-    shuffleEnabled = true;
   }
 
   void disableShuffle() {
@@ -155,6 +233,7 @@ class QueueManager {
   /// An item was removed from the queue. Adjust the shuffled list and
   /// the shuffle cursor.
   void onItemRemoved(String id) {
+    _userQueuedIds.remove(id); // keep the user section in sync on removal
     if (!shuffleEnabled) return;
     final idx = _shuffledIds.indexOf(id);
     if (idx == -1) return;
@@ -184,5 +263,6 @@ class QueueManager {
     shuffleEnabled = false;
     _shuffledIds.clear();
     _shuffleIndex = 0;
+    _userQueuedIds.clear();
   }
 }

@@ -237,6 +237,10 @@ class TrackTile extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
 
+  /// Optional long-press handler — used to open the track-actions sheet
+  /// (Play next / Add to queue / Add to playlist).
+  final VoidCallback? onLongPress;
+
   const TrackTile({
     super.key,
     required this.imageUrl,
@@ -246,6 +250,7 @@ class TrackTile extends StatelessWidget {
     this.trailingText,
     this.trailing,
     this.active = false,
+    this.onLongPress,
   });
 
   @override
@@ -254,6 +259,7 @@ class TrackTile extends StatelessWidget {
     // share the same tap language as cards and buttons (no Android ripple).
     return Pressable(
       onTap: onTap,
+      onLongPress: onLongPress,
       pressedScale: 0.98,
       child: Padding(
         // A touch more vertical air (8→10) for Apple-Music breathing room

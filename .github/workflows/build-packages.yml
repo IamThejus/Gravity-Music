@@ -92,6 +92,10 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: write   # required to attach the APK to the Release on v* tags
+    env:
+      # Surfaced so the signing step below can guard on presence. Secrets are
+      # unavailable to PRs from forks — those builds fall back to debug signing.
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
     steps:
       - name: Checkout
@@ -112,9 +116,29 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      # Decode the stable release keystore + write android/key.properties so the
+      # APK is signed with a fingerprint whose SHA-1 is registered in the Google
+      # OAuth client (fixes CI Google sign-in). Skipped when the secret is absent
+      # (fork PRs) — the build then falls back to the debug key.
+      - name: Configure release signing
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/gravity-release.jks
+          cat > android/key.properties <<EOF
+          storeFile=gravity-release.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+
       - name: Build release APK
-        # Release build signs with the debug key (android/app/build.gradle.kts),
-        # so it installs via sideload. It is NOT Play-Store-signed.
+        # Signed with the stable release key when the keystore secret is set
+        # (SHA-1 registered in Google OAuth → sign-in works); otherwise the debug
+        # key. Either way it's sideload-installed, NOT Play-Store-signed.
         run: flutter build apk --release
 
       - name: Name the APK with the version

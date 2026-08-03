@@ -16,6 +16,7 @@ import '../app_theme.dart';
 import '../ui_helpers.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/mini_player.dart';
+import '../widgets/track_actions.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final Album album;
@@ -166,7 +167,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               ),
               SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (_, i) {
+                  (context, i) {
                     final t = tracks[i];
                     return TrackTile(
                       imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
@@ -176,6 +177,14 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                       onTap: () => _pc.playAllMedia(
                           tracks.map((x) => x.toMediaItem()).toList(),
                           startIndex: i),
+                      onLongPress: () => showTrackActionsSheet(
+                        context,
+                        videoId: t.videoId,
+                        title: t.title,
+                        artist: t.artistLine,
+                        thumbnail: t.thumbnail,
+                        duration: t.durationValue,
+                      ),
                     );
                   },
                   childCount: tracks.length,

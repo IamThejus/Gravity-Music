@@ -21,6 +21,7 @@ import '../shell/responsive.dart';
 import '../ui_helpers.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/mini_player.dart';
+import '../widgets/track_actions.dart';
 import 'import_playlist.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -719,7 +720,7 @@ class LikedSongsScreen extends StatelessWidget {
           else
             SliverList(
               delegate: SliverChildBuilderDelegate(
-                (_, i) {
+                (context, i) {
                   final t = liked[i];
                   return TrackTile(
                     imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
@@ -728,6 +729,14 @@ class LikedSongsScreen extends StatelessWidget {
                     onTap: () => pc.playAllMedia(
                         liked.map((x) => x.toMediaItem()).toList(),
                         startIndex: i),
+                    onLongPress: () => showTrackActionsSheet(
+                      context,
+                      videoId: t.videoId,
+                      title: t.title,
+                      artist: t.artist,
+                      thumbnail: t.thumbnail,
+                      duration: t.durationValue,
+                    ),
                   );
                 },
                 childCount: liked.length,
@@ -859,12 +868,20 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             ),
             SliverList(
               delegate: SliverChildBuilderDelegate(
-                (_, i) {
+                (context, i) {
                   final t = pl.tracks[i];
                   return TrackTile(
                     imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
                     title: t.title,
                     subtitle: t.artist,
+                    onLongPress: () => showTrackActionsSheet(
+                      context,
+                      videoId: t.videoId,
+                      title: t.title,
+                      artist: t.artist,
+                      thumbnail: t.thumbnail,
+                      duration: t.durationValue,
+                    ),
                     trailing: IconButton(
                       icon: const Icon(Icons.remove_circle_outline_rounded,
                           color: AppColors.textTertiary),
@@ -1015,7 +1032,7 @@ class DownloadsScreen extends StatelessWidget {
               else
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (_, i) {
+                    (context, i) {
                       final t = downloads[i];
                       return TrackTile(
                         imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
@@ -1029,6 +1046,14 @@ class DownloadsScreen extends StatelessWidget {
                         onTap: () => pc.playAllMedia(
                             downloads.map((x) => x.toMediaItem()).toList(),
                             startIndex: i),
+                        onLongPress: () => showTrackActionsSheet(
+                          context,
+                          videoId: t.videoId,
+                          title: t.title,
+                          artist: t.artist,
+                          thumbnail: t.thumbnail,
+                          duration: t.durationValue,
+                        ),
                       );
                     },
                     childCount: downloads.length,

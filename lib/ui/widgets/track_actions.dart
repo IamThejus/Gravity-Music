@@ -17,6 +17,82 @@ import '../now_playing/now_playing_screen.dart' show showAddToPlaylistSheet;
 import '../theme/glass.dart';
 import '../ui_helpers.dart';
 
+/// Wraps a song row so swiping it RIGHT adds the track to the user queue. The
+/// row springs back — it's an action, not a dismissal — and never interrupts
+/// what's playing. Use across song lists (search, playlist, liked, album,
+/// downloads) for one consistent gesture; pair with a long-press →
+/// [showTrackActionsSheet] for the full menu.
+class SwipeToQueue extends StatelessWidget {
+  final String videoId;
+  final String title;
+  final String artist;
+  final String thumbnail;
+  final Duration? duration;
+
+  /// A value unique within the list (usually the item index) so the underlying
+  /// Dismissible gets a stable, collision-free key even if a song repeats.
+  final Object slot;
+  final Widget child;
+
+  const SwipeToQueue({
+    super.key,
+    required this.videoId,
+    required this.title,
+    required this.artist,
+    required this.thumbnail,
+    required this.slot,
+    required this.child,
+    this.duration,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: ValueKey('swq-$videoId-$slot'),
+      direction: DismissDirection.startToEnd,
+      confirmDismiss: (_) async {
+        AppHaptics.medium();
+        Get.find<PlayerController>().addToUserQueue(videoId,
+            title: title,
+            artist: artist,
+            thumbnail: thumbnail,
+            duration: duration);
+        Get.snackbar('Added to queue', '“${prettyTitle(title)}” added',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: AppColors.card,
+            colorText: AppColors.white,
+            duration: const Duration(seconds: 2));
+        return false; // keep the row — this is an action, not a removal
+      },
+      background: const _QueueSwipeBg(),
+      child: child,
+    );
+  }
+}
+
+/// The accent reveal shown behind a row while it's swiped right to enqueue.
+class _QueueSwipeBg extends StatelessWidget {
+  const _QueueSwipeBg();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.only(left: AppSpacing.screenMargin + 6),
+      color: AppColors.accent.withOpacity(0.18),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.queue_music_rounded, color: AppColors.accent),
+          const SizedBox(width: 8),
+          Text('Add to queue',
+              style: AppText.title(size: 13, color: AppColors.accent)),
+        ],
+      ),
+    );
+  }
+}
+
 /// Opens the actions sheet for a single track. All fields mirror what the
 /// play/enqueue APIs need; [duration] is optional.
 void showTrackActionsSheet(

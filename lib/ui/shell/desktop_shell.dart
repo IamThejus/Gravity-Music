@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import '../app_theme.dart';
 import 'desktop_sidebar.dart';
 import 'now_playing_bar.dart';
+import 'responsive.dart';
 
 class DesktopShell extends StatelessWidget {
   final Widget content;
@@ -32,12 +33,21 @@ class DesktopShell extends StatelessWidget {
       body: Column(
         children: [
           Expanded(
-            child: Row(
-              children: [
-                DesktopSidebar(currentIndex: currentIndex, onTap: onTap),
-                Expanded(child: content),
-              ],
-            ),
+            // Collapse the sidebar to an icon rail when the window is narrow —
+            // still the desktop shell, never the mobile dock.
+            child: LayoutBuilder(builder: (context, c) {
+              final collapsed = c.maxWidth < kSidebarCollapseWidth;
+              return Row(
+                children: [
+                  DesktopSidebar(
+                    currentIndex: currentIndex,
+                    onTap: onTap,
+                    collapsed: collapsed,
+                  ),
+                  Expanded(child: content),
+                ],
+              );
+            }),
           ),
           const NowPlayingBar(),
         ],

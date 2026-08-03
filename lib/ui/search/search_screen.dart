@@ -211,29 +211,15 @@ class SearchScreen extends StatelessWidget {
                       return _AlbumStrip(albums: albums, onOpen: openAlbum);
                     }
                     final r = songs[i - (hasAlbums ? 1 : 0)];
-                    // Swipe right → Add to queue (the row springs back — it's
-                    // an action, not a dismissal, so it never removes the
-                    // result or interrupts what's playing). Long-press → full
-                    // actions sheet.
-                    return Dismissible(
-                      key: ValueKey('search-${r.videoId}-$i'),
-                      direction: DismissDirection.startToEnd,
-                      confirmDismiss: (_) async {
-                        AppHaptics.medium();
-                        pc.addToUserQueue(r.videoId,
-                            title: r.title,
-                            artist: r.artistLine,
-                            thumbnail: r.thumbnail,
-                            duration: r.durationValue);
-                        Get.snackbar('Added to queue',
-                            '“${r.title}” added',
-                            snackPosition: SnackPosition.BOTTOM,
-                            backgroundColor: AppColors.card,
-                            colorText: AppColors.white,
-                            duration: const Duration(seconds: 2));
-                        return false;
-                      },
-                      background: const _QueueSwipeBackground(),
+                    // Swipe right → Add to queue; long-press → full actions
+                    // sheet. Same gesture on every song list (see SwipeToQueue).
+                    return SwipeToQueue(
+                      slot: i,
+                      videoId: r.videoId,
+                      title: r.title,
+                      artist: r.artistLine,
+                      thumbnail: r.thumbnail,
+                      duration: r.durationValue,
                       child: TrackTile(
                         imageUrl: sizedThumb(r.thumbnail, ThumbnailSize.tile),
                         title: r.title,
@@ -405,29 +391,6 @@ class _IdleView extends StatelessWidget {
           }),
         ),
       ],
-    );
-  }
-}
-
-/// The reveal shown behind a search row while it's swiped right to enqueue.
-class _QueueSwipeBackground extends StatelessWidget {
-  const _QueueSwipeBackground();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.only(left: AppSpacing.screenMargin + 6),
-      color: AppColors.accent.withOpacity(0.18),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.queue_music_rounded, color: AppColors.accent),
-          const SizedBox(width: 8),
-          Text('Add to queue',
-              style: AppText.title(size: 13, color: AppColors.accent)),
-        ],
-      ),
     );
   }
 }

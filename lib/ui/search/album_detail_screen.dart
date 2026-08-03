@@ -169,21 +169,29 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                 delegate: SliverChildBuilderDelegate(
                   (context, i) {
                     final t = tracks[i];
-                    return TrackTile(
-                      imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
+                    return SwipeToQueue(
+                      slot: i,
+                      videoId: t.videoId,
                       title: t.title,
-                      subtitle: t.artistLine,
-                      trailingText: t.duration,
-                      onTap: () => _pc.playAllMedia(
-                          tracks.map((x) => x.toMediaItem()).toList(),
-                          startIndex: i),
-                      onLongPress: () => showTrackActionsSheet(
-                        context,
-                        videoId: t.videoId,
+                      artist: t.artistLine,
+                      thumbnail: t.thumbnail,
+                      duration: t.durationValue,
+                      child: TrackTile(
+                        imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
                         title: t.title,
-                        artist: t.artistLine,
-                        thumbnail: t.thumbnail,
-                        duration: t.durationValue,
+                        subtitle: t.artistLine,
+                        trailingText: t.duration,
+                        onTap: () => _pc.playAllMedia(
+                            tracks.map((x) => x.toMediaItem()).toList(),
+                            startIndex: i),
+                        onLongPress: () => showTrackActionsSheet(
+                          context,
+                          videoId: t.videoId,
+                          title: t.title,
+                          artist: t.artistLine,
+                          thumbnail: t.thumbnail,
+                          duration: t.durationValue,
+                        ),
                       ),
                     );
                   },

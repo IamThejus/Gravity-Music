@@ -101,16 +101,19 @@ class _RootShellState extends State<RootShell>
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      if (isDesktopWidth(constraints.maxWidth)) {
-        return DesktopShell(
-          content: _content(),
-          currentIndex: _index,
-          onTap: _onTap,
-        );
-      }
-      // ── Mobile shell (unchanged) ──
-      return Scaffold(
+    // Shell is chosen by PLATFORM, not window width: desktop (Linux/Windows/
+    // macOS) always gets the sidebar shell — even when the window is small —
+    // instead of falling back to the Android floating-dock layout. Mobile is
+    // untouched.
+    if (isDesktopPlatform) {
+      return DesktopShell(
+        content: _content(),
+        currentIndex: _index,
+        onTap: _onTap,
+      );
+    }
+    // ── Mobile shell (unchanged) ──
+    return Scaffold(
         backgroundColor: AppColors.canvas,
         extendBody: true,
         body: Stack(
@@ -138,6 +141,5 @@ class _RootShellState extends State<RootShell>
           ],
         ),
       );
-    });
   }
 }

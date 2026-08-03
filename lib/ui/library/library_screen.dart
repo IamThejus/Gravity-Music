@@ -722,20 +722,28 @@ class LikedSongsScreen extends StatelessWidget {
               delegate: SliverChildBuilderDelegate(
                 (context, i) {
                   final t = liked[i];
-                  return TrackTile(
-                    imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
+                  return SwipeToQueue(
+                    slot: i,
+                    videoId: t.videoId,
                     title: t.title,
-                    subtitle: t.artist,
-                    onTap: () => pc.playAllMedia(
-                        liked.map((x) => x.toMediaItem()).toList(),
-                        startIndex: i),
-                    onLongPress: () => showTrackActionsSheet(
-                      context,
-                      videoId: t.videoId,
+                    artist: t.artist,
+                    thumbnail: t.thumbnail,
+                    duration: t.durationValue,
+                    child: TrackTile(
+                      imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
                       title: t.title,
-                      artist: t.artist,
-                      thumbnail: t.thumbnail,
-                      duration: t.durationValue,
+                      subtitle: t.artist,
+                      onTap: () => pc.playAllMedia(
+                          liked.map((x) => x.toMediaItem()).toList(),
+                          startIndex: i),
+                      onLongPress: () => showTrackActionsSheet(
+                        context,
+                        videoId: t.videoId,
+                        title: t.title,
+                        artist: t.artist,
+                        thumbnail: t.thumbnail,
+                        duration: t.durationValue,
+                      ),
                     ),
                   );
                 },
@@ -870,30 +878,38 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
               delegate: SliverChildBuilderDelegate(
                 (context, i) {
                   final t = pl.tracks[i];
-                  return TrackTile(
-                    imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
+                  return SwipeToQueue(
+                    slot: i,
+                    videoId: t.videoId,
                     title: t.title,
-                    subtitle: t.artist,
-                    onLongPress: () => showTrackActionsSheet(
-                      context,
-                      videoId: t.videoId,
+                    artist: t.artist,
+                    thumbnail: t.thumbnail,
+                    duration: t.durationValue,
+                    child: TrackTile(
+                      imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
                       title: t.title,
-                      artist: t.artist,
-                      thumbnail: t.thumbnail,
-                      duration: t.durationValue,
+                      subtitle: t.artist,
+                      onLongPress: () => showTrackActionsSheet(
+                        context,
+                        videoId: t.videoId,
+                        title: t.title,
+                        artist: t.artist,
+                        thumbnail: t.thumbnail,
+                        duration: t.durationValue,
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.remove_circle_outline_rounded,
+                            color: AppColors.textTertiary),
+                        onPressed: () {
+                          LibraryService.removeTrackFromPlaylist(
+                              pl.id, t.videoId);
+                          setState(() {});
+                        },
+                      ),
+                      onTap: () => pc.playAllMedia(
+                          pl.tracks.map((x) => x.toMediaItem()).toList(),
+                          startIndex: i),
                     ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.remove_circle_outline_rounded,
-                          color: AppColors.textTertiary),
-                      onPressed: () {
-                        LibraryService.removeTrackFromPlaylist(
-                            pl.id, t.videoId);
-                        setState(() {});
-                      },
-                    ),
-                    onTap: () => pc.playAllMedia(
-                        pl.tracks.map((x) => x.toMediaItem()).toList(),
-                        startIndex: i),
                   );
                 },
                 childCount: pl.tracks.length,
@@ -1034,25 +1050,33 @@ class DownloadsScreen extends StatelessWidget {
                   delegate: SliverChildBuilderDelegate(
                     (context, i) {
                       final t = downloads[i];
-                      return TrackTile(
-                        imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
+                      return SwipeToQueue(
+                        slot: i,
+                        videoId: t.videoId,
                         title: t.title,
-                        subtitle: t.artist,
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded,
-                              color: AppColors.textTertiary),
-                          onPressed: () => dc.delete(t.videoId),
-                        ),
-                        onTap: () => pc.playAllMedia(
-                            downloads.map((x) => x.toMediaItem()).toList(),
-                            startIndex: i),
-                        onLongPress: () => showTrackActionsSheet(
-                          context,
-                          videoId: t.videoId,
+                        artist: t.artist,
+                        thumbnail: t.thumbnail,
+                        duration: t.durationValue,
+                        child: TrackTile(
+                          imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
                           title: t.title,
-                          artist: t.artist,
-                          thumbnail: t.thumbnail,
-                          duration: t.durationValue,
+                          subtitle: t.artist,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                color: AppColors.textTertiary),
+                            onPressed: () => dc.delete(t.videoId),
+                          ),
+                          onTap: () => pc.playAllMedia(
+                              downloads.map((x) => x.toMediaItem()).toList(),
+                              startIndex: i),
+                          onLongPress: () => showTrackActionsSheet(
+                            context,
+                            videoId: t.videoId,
+                            title: t.title,
+                            artist: t.artist,
+                            thumbnail: t.thumbnail,
+                            duration: t.durationValue,
+                          ),
                         ),
                       );
                     },

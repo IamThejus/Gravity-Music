@@ -79,8 +79,8 @@ class _UpdateDialog extends StatelessWidget {
               const SizedBox(height: 8),
               _Notes(body: release.body),
               const SizedBox(height: 12),
-              // Live progress / errors / actions.
-              Obx(() => _Footer(c: c, release: release)),
+              // Live progress / errors / actions (the footer wraps its own Obx).
+              _Footer(c: c, release: release),
             ],
           ),
         ),
@@ -167,6 +167,12 @@ class _Footer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Obx here (not around the widget construction) so the reactive reads of
+    // phase/progress/errorMessage happen INSIDE the observer's builder.
+    return Obx(() => _content(context));
+  }
+
+  Widget _content(BuildContext context) {
     switch (c.phase.value) {
       case UpdatePhase.downloading:
         final pct = (c.progress.value * 100).clamp(0, 100).toStringAsFixed(0);

@@ -1,7 +1,11 @@
 name: saragama
 description: A modern, minimal YouTube audio player.
 publish_to: 'none'
-version: 2.0.0
+# version: <semver>+<versionCode>. The semver MUST equal the release tag
+# (v2.0.0 → 2.0.0) or the in-app updater misfires. versionCode = major*10000 +
+# minor*100 + patch, so it always increases with the semver — see "Releasing"
+# in CLAUDE.md.
+version: 2.0.1+20001
 
 environment:
   sdk: ">=3.1.5 <4.0.0"

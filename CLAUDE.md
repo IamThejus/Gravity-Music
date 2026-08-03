@@ -19,6 +19,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `flutter build windows` — Windows release runner (Windows only). CI additionally packages it into an Inno Setup `.exe` installer via `windows/packaging/gravity-music.iss` (see Platform integration).
 - `dart run flutter_launcher_icons` — regenerate launcher icons (Android/iOS/**Windows `.ico`**) from `assets/app_icon.png`
 
+## Releasing
+
+Releases are cut by pushing a **`vX.Y.Z`** git tag on `main` — CI (`.github/workflows/build-packages.yml`) then builds the Android APK + Linux `.deb`/`.rpm` + Windows `.exe`/`.msix` and publishes a GitHub Release with them attached. The **in-app updater** (`UpdateService`, `services/update_service.dart`) reads that release, so **version consistency is load-bearing**:
+
+- **`pubspec.yaml` `version:` semver MUST equal the tag** (tag `v2.0.1` → `version: 2.0.1+…`). The app reports its version from `pubspec` (via `package_info_plus`); the "latest" comes from the tag. If they disagree on a release the updater nags forever (pubspec lower) or never prompts (pubspec higher). Tag the commit *after* the pubspec bump lands.
+- **`+<versionCode>`** = `major*10000 + minor*100 + patch` (`2.0.1` → `+20001`) so Android's versionCode always increases with the semver — needed for the updater's install to be a clean "update", not a same-code reinstall.
+- Tag names are `vX.Y.Z` only (CI matches `v*`; the updater strips a leading `v`).
+- Sequence: bump `pubspec.yaml` → commit → `git tag vX.Y.Z` (on that commit) → `git push origin main && git push origin vX.Y.Z`.
+- The `android` CI job signs with the stable release keystore from encrypted secrets (see the signing note under Cloud sync) — keep those set so released APKs carry the OAuth-registered SHA-1.
+
 ## Design reference
 
 `references/` holds the design system: `references/gravity_music/DESIGN.md` is the full spec ("Cinematic Dark" / glassmorphism, obsidian-black OLED palette, 30px backdrop blurs, floating "suspended" layout where no element touches screen edges). Each screen folder (`home/`, `library/`, `now_playing/`, `search/`) has a `code.html` Tailwind mockup + `screen.png`. The design tokens live in code as `AppColors` / `AppText` / `AppSpacing` in `lib/ui/app_theme.dart` and the glass primitives in `lib/ui/theme/glass.dart` — use those, not raw values.

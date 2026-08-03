@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Exposes the updater's download dir to the FileProvider. The APK is written
+     by ApkDownloadService into getTemporaryDirectory()/updates, which on
+     Android is the app cache dir (getCacheDir()/updates). -->
+<paths>
+    <cache-path name="updates" path="updates/" />
+    <external-cache-path name="ext_updates" path="updates/" />
+</paths>

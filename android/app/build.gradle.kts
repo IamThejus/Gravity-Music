@@ -80,3 +80,9 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // FileProvider (androidx.core.content.FileProvider) — used by the in-app
+    // updater to hand the downloaded APK to the package installer.
+    implementation("androidx.core:core-ktx:1.13.1")
+}

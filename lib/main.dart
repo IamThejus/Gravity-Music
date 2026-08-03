@@ -15,6 +15,7 @@ import 'controllers/import_controller.dart';
 import 'controllers/lyrics_controller.dart';
 import 'controllers/player_controller.dart';
 import 'controllers/playlist_download_controller.dart';
+import 'controllers/update_controller.dart';
 import 'services/audio_handler.dart';
 import 'services/battery_optimization.dart';
 import 'services/heartbeat_service.dart';
@@ -105,6 +106,10 @@ void main() async {
   // playing (observes PlayerController.buttonState — no extra listeners).
   Get.put(HeartbeatService());
 
+  // In-app updater (GitHub Releases). Registered here so Settings can find it;
+  // the actual startup check runs post-first-frame below.
+  Get.put(UpdateController());
+
 // Listen to song changes and auto-fetch lyrics
 ever(Get.find<PlayerController>().currentSong, (song) {
   if (song != null) {
@@ -139,6 +144,10 @@ ever(Get.find<PlayerController>().currentSong, (song) {
         if (!Get.isRegistered<SyncService>()) Get.put(SyncService());
       });
     }
+
+    // Silent GitHub update check (Android only). Non-blocking; shows the update
+    // dialog at most once per launch if a newer, non-skipped version exists.
+    Get.find<UpdateController>().checkOnStartup();
   });
 }
 

@@ -22,6 +22,7 @@ import '../ui_helpers.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/track_actions.dart';
+import '../settings/settings_screen.dart';
 import 'import_playlist.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -82,6 +83,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
             child: Row(
               children: [
                 Expanded(child: Text('Library', style: AppText.heading(size: 32))),
+                GlassIconButton(
+                  icon: Icons.settings_rounded,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const SettingsScreen())),
+                ),
+                const SizedBox(width: 10),
                 GlassIconButton(
                   icon: Icons.add_rounded,
                   onTap: () => _createPlaylist(context),

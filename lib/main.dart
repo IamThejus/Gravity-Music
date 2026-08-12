@@ -11,6 +11,7 @@ import 'services/app_paths.dart';
 import 'services/cloud/auth_service.dart';
 import 'services/cloud/sync_service.dart';
 import 'controllers/download_controller.dart';
+import 'controllers/equalizer_controller.dart';
 import 'controllers/import_controller.dart';
 import 'controllers/lyrics_controller.dart';
 import 'controllers/player_controller.dart';
@@ -87,6 +88,10 @@ void main() async {
   Get.put(PlayerController(audioHandler: audioHandler));
   final lyricsController = Get.put(LyricsController());
 
+  // Equalizer state + persistence. Registered after the audio handler so the
+  // first apply has a player to talk to where one already exists.
+  final equalizerController = Get.put(EqualizerController());
+
   // Drives the artwork → accent/base color theming used across the UI.
   Get.put(DynamicColorController());
 
@@ -120,6 +125,26 @@ ever(Get.find<PlayerController>().currentSong, (song) {
       thumbnailUrl: song.artUri?.toString(),
     );
   }
+});
+
+// mpv keeps `af` across tracks, but the underlying platform player doesn't
+// exist yet at the points where we'd like to apply the chain: on desktop,
+// PlaybackEngine.init() never calls setAudioSource, so just_audio's native
+// platform (and MediaKitPlayer with it) is only created by the FIRST
+// loadCurrent() — and audio_handler.dart's mediaItem.add(song) (which drives
+// the hook below) runs BEFORE that loadCurrent() call on both the normal
+// play path and restoreSession. So on cold start this hook alone finds no
+// player and reapply() is a no-op for track 1. The player can also be torn
+// down and recreated mid-session (e.g. AudioPlayer.stop() during
+// playback-error recovery), silently dropping the chain again. The second
+// worker below (on buttonState reaching `playing`) re-asserts once playback
+// has actually started, i.e. once the player is guaranteed to exist —
+// between the two hooks the chain always lands. Reapplying is idempotent
+// and cheap, so firing on every track change AND every play is fine.
+ever(Get.find<PlayerController>().currentSong,
+    (_) => equalizerController.reapply());
+ever(Get.find<PlayerController>().buttonState, (state) {
+  if (state == PlayButtonState.playing) equalizerController.reapply();
 });
 
   runApp(const YTPlayerApp());

@@ -7,6 +7,9 @@
 <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 <!-- In-app updater: install the downloaded release APK. -->
 <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+<!-- Equalizer: android.media.audiofx.AudioEffect requires this to attach to
+     the player's audio session. Normal permission, granted at install. -->
+<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <application
         android:label="Gravity Music"
         android:name="${applicationName}"

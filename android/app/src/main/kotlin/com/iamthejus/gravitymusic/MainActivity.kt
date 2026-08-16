@@ -15,6 +15,7 @@ import java.io.File
 class MainActivity : AudioServiceActivity() {
     private val channel = "com.saragama/battery"
     private val installerChannel = "com.saragama/installer"
+    private val systemSettingsChannel = "com.saragama/system_settings"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -56,6 +57,41 @@ class MainActivity : AudioServiceActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // ── System settings we can't change ourselves ───────────────────────
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, systemSettingsChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "openAccessibilitySettings" -> {
+                        openAccessibilitySettings()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    // Mono audio is an Android accessibility setting (Settings.Secure
+    // "master_mono"). Writing it needs WRITE_SECURE_SETTINGS, a signature
+    // permission we can't hold, so the most an app can do is open the screen
+    // that owns the switch.
+    private fun openAccessibilitySettings() {
+        try {
+            startActivity(
+                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (e: Exception) {
+            // Some OEM ROMs rename or remove the accessibility activity —
+            // fall back to the top-level settings app rather than nothing.
+            try {
+                startActivity(
+                    Intent(Settings.ACTION_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (_: Exception) {
+            }
+        }
     }
 
     // Android 8+ gates sideloaded installs behind a per-app "install unknown

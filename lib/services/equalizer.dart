@@ -1,8 +1,10 @@
 // services/equalizer.dart
-// Pure equalizer model: band definitions, presets, and mpv filter-chain
-// construction. No Flutter / media_kit / Hive imports, so the builder is unit
-// testable without a player or a running app. Applying the chain is
-// AudioEffects' job; this file only decides what the chain should be.
+// Pure audio-effects model: equalizer band definitions and presets, mpv
+// filter-chain construction (equalizer + mono downmix), and the
+// log-frequency resampling Android needs. No Flutter / media_kit / Hive
+// imports, so all of it is unit testable without a player or a running app.
+// Applying the result is AudioEffects' job; this file only decides what
+// should be applied.
 //
 // The chain is an mpv `af` value built from ffmpeg's two-pole peaking
 // `equalizer` filter. Verified against mpv 0.41.0: a comma-chained lavfi graph
@@ -20,7 +22,16 @@
 // adds playback-speed control, the two writers will need to compose a single
 // `af` value (e.g. our equalizer bands + scaletempo chained together) instead
 // of each unconditionally overwriting the property — a naive last-write-wins
-// implementation will silently drop one effect or the other.
+// implementation will silently drop one effect or the other. Our OWN effects
+// already hit exactly this: the equalizer and the mono downmix both live in
+// `af`, which is why [buildFilterChain] composes them into one graph rather
+// than each having its own writer.
+//
+// Android does NOT use the chain at all: there the platform's own
+// android.media.audiofx.Equalizer is driven band by band, and its bands are
+// chosen by the device rather than by us — see [gainAtFrequency].
+
+import 'dart:math' show log;
 
 /// Standard 10-band ISO centre frequencies, in Hz.
 const List<int> kEqFrequencies = <int>[
@@ -56,8 +67,46 @@ const Map<String, List<double>> kEqPresets = <String, List<double>>{
 ///
 /// Tolerates a short or over-long [bands] list rather than throwing: persisted
 /// preferences can be corrupt, and an equalizer must never break playback.
-String buildEqualizerChain(List<double> bands, {required bool enabled}) {
-  if (!enabled) return '';
+String buildEqualizerChain(List<double> bands, {required bool enabled}) =>
+    _wrap(_equalizerNodes(bands, enabled));
+
+/// Filters that collapse stereo to dual mono: both output channels carry the
+/// same L+R sum, so the full mix reaches each ear. Used for the accessibility
+/// mono-audio setting (single-sided hearing loss, one earbud in).
+///
+/// The `aformat` node is not optional. `pan` reads `c1`, and a graph that
+/// references a channel its input doesn't have is an error — an already-mono
+/// source would break the whole chain, taking the equalizer down with it.
+/// Forcing a stereo input first makes `pan` safe for any source; verified
+/// against a mono input in ffmpeg, which upmixes rather than failing.
+const List<String> _kMonoNodes = <String>[
+  'aformat=channel_layouts=stereo',
+  'pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1',
+];
+
+/// Build the complete mpv `af` value for every desktop effect at once.
+///
+/// This exists because `af` is a single property that can only have ONE
+/// writer: pushing the equalizer chain alone would silently drop mono, and
+/// vice versa (the hazard this file's header warns about). Everything that
+/// wants to filter desktop audio composes into this one graph.
+///
+/// Returns `''` — no filter at all — when nothing is active. Equalization is
+/// applied per channel BEFORE the downmix, so mono hears the same tone curve
+/// stereo would.
+String buildFilterChain({
+  required List<double> bands,
+  required bool equalizerEnabled,
+  required bool mono,
+}) =>
+    _wrap([
+      ..._equalizerNodes(bands, equalizerEnabled),
+      if (mono) ..._kMonoNodes,
+    ]);
+
+/// One ffmpeg `equalizer` node per non-flat band; empty when bypassed.
+List<String> _equalizerNodes(List<double> bands, bool enabled) {
+  if (!enabled) return const [];
 
   final parts = <String>[];
   final count =
@@ -75,7 +124,49 @@ String buildEqualizerChain(List<double> bands, {required bool enabled}) {
         ':w=${_kBandWidth.toStringAsFixed(1)}'
         ':g=$gainStr');
   }
+  return parts;
+}
 
-  if (parts.isEmpty) return '';
-  return 'lavfi=[${parts.join(',')}]';
+/// Wrap filter nodes in the single lavfi graph mpv's `af` expects, or `''`
+/// when there is nothing to apply.
+String _wrap(List<String> nodes) =>
+    nodes.isEmpty ? '' : 'lavfi=[${nodes.join(',')}]';
+
+/// The gain the [bands] curve implies at an arbitrary centre frequency [hz].
+///
+/// Needed because Android's equalizer bands are chosen by the DEVICE, not by
+/// us — commonly five, at frequencies that don't line up with
+/// [kEqFrequencies] — so the user's 10-band curve has to be resampled onto
+/// whatever the hardware reports. (Desktop needs none of this: mpv takes our
+/// frequencies verbatim.)
+///
+/// Interpolation is linear in LOG frequency, the axis the bands are actually
+/// spaced on and the one the UI draws. A device band at 910 Hz therefore lands
+/// roughly midway between the 500 Hz and 1 kHz sliders; interpolating linearly
+/// in raw Hz would drag it almost entirely onto 1 kHz and make the middle of
+/// the user's curve nearly unreachable.
+///
+/// Frequencies outside the modelled range clamp to the nearest end band, so a
+/// device band at 20 Hz or 20 kHz still tracks the 31 Hz / 16 kHz slider.
+/// Tolerates a short or over-long [bands] list, matching
+/// [buildEqualizerChain]: persisted preferences can be corrupt, and an
+/// equalizer must never break playback.
+double gainAtFrequency(List<double> bands, double hz) {
+  if (bands.isEmpty || !hz.isFinite || hz <= 0) return 0.0;
+
+  final count =
+      bands.length < kEqFrequencies.length ? bands.length : kEqFrequencies.length;
+  double gainAt(int i) => bands[i].clamp(kEqMinGain, kEqMaxGain).toDouble();
+
+  if (hz <= kEqFrequencies[0]) return gainAt(0);
+  if (hz >= kEqFrequencies[count - 1]) return gainAt(count - 1);
+
+  for (var i = 0; i < count - 1; i++) {
+    final hi = kEqFrequencies[i + 1].toDouble();
+    if (hz > hi) continue;
+    final lo = kEqFrequencies[i].toDouble();
+    final t = (log(hz) - log(lo)) / (log(hi) - log(lo));
+    return gainAt(i) + (gainAt(i + 1) - gainAt(i)) * t;
+  }
+  return gainAt(count - 1);
 }

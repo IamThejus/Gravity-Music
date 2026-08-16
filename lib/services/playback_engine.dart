@@ -20,6 +20,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../util/log.dart';
+import 'audio_effects.dart';
 import 'volume_mixer.dart';
 
 // ── Playback state machine ──────────────────────────────────────────────────
@@ -137,7 +138,31 @@ class PlaybackEngine {
   /// the (empty) playlist source, and start the auto-advance listener.
   /// Idempotent — calling twice would re-listen, so callers should call once.
   void init() {
+    // The equalizer is the one effect that cannot be attached after the fact:
+    // just_audio takes its AudioPipeline as a constructor argument. Build it
+    // here and hand the effect to AudioEffects, which owns everything else
+    // about applying it. Android only — desktop drives mpv's `af` property
+    // instead, and no other platform has a backend for it.
+    //
+    // Attached unconditionally, not gated on the user's eqEnabled preference,
+    // because the pipeline is fixed at construction: gating it would mean the
+    // EQ toggle did nothing until an app restart. The cost is that just_audio
+    // constructs an android.media.audiofx.Equalizer on the audio session at
+    // load time even while the effect is disabled. That class is CDD-mandated
+    // and present on real devices, but on a stripped AOSP build or an emulator
+    // that lacks it the native constructor throws — surfacing as a load-time
+    // PlatformException (just_audio's method handler catches it), i.e. broken
+    // playback rather than a crash. If that is ever reported in the wild, the
+    // fix is to gate this on the pref and recreate the player on toggle.
+    final androidEqualizer = Platform.isAndroid ? AndroidEqualizer() : null;
+    if (androidEqualizer != null) {
+      AudioEffects.attachAndroidEqualizer(androidEqualizer);
+    }
+
     player = AudioPlayer(
+      audioPipeline: androidEqualizer == null
+          ? null
+          : AudioPipeline(androidAudioEffects: [androidEqualizer]),
       audioLoadConfiguration: const AudioLoadConfiguration(
         androidLoadControl: AndroidLoadControl(
           // Reduced from 120s → 30s. Saves ~2MB per skip vs old behaviour.

@@ -1,6 +1,12 @@
-// controllers/equalizer_controller.dart
-// Reactive equalizer state: band gains, preset selection, enable flag, plus
-// persistence and debounced application to the audio backend.
+// controllers/audio_effects_controller.dart
+// Reactive audio-effect state: equalizer band gains, preset selection and
+// enable flag, plus the mono downmix — with persistence and debounced
+// application to the audio backend.
+//
+// The equalizer and mono share one controller rather than getting one each
+// because on desktop they are not independent: both are written to mpv's
+// single `af` property, so they have to be restored together at boot and
+// re-composed on every change (see AudioEffects / buildFilterChain).
 //
 // The maths lives in services/equalizer.dart and the platform call in
 // services/audio_effects.dart; this class only holds state and decides WHEN to
@@ -14,10 +20,14 @@ import 'package:hive/hive.dart';
 import '../services/audio_effects.dart';
 import '../services/equalizer.dart';
 
-class EqualizerController extends GetxController {
+class AudioEffectsController extends GetxController {
   final enabled = false.obs;
   final bands = List<double>.filled(kEqFrequencies.length, 0.0).obs;
   final preset = 'Flat'.obs;
+
+  /// Downmix both channels into each speaker. Desktop only — on Android this
+  /// stays false and the UI points at the OS accessibility setting instead.
+  final mono = false.obs;
 
   /// Slider drags fire continuously; rebuilding and pushing a filter graph on
   /// every frame would swap mpv's chain dozens of times a second. Coalesce.
@@ -70,19 +80,25 @@ class EqualizerController extends GetxController {
     if (storedPreset is String && storedPreset.isNotEmpty) {
       preset.value = storedPreset;
     }
+
+    mono.value = _box.get('monoAudio') == true;
   }
 
   void _persist() {
     _box.put('eqEnabled', enabled.value);
     _box.put('eqBands', bands.toList());
     _box.put('eqPreset', preset.value);
+    _box.put('monoAudio', mono.value);
   }
 
-  /// Rebuild the chain and push it to the backend immediately.
-  Future<void> _applyNow() async {
-    final chain = buildEqualizerChain(bands, enabled: enabled.value);
-    await AudioEffects.applyEqualizer(chain);
-  }
+  /// Push every effect's current state to the backend immediately. How it
+  /// gets applied (one mpv filter chain on desktop, the device's own bands on
+  /// Android) is AudioEffects' problem, not ours.
+  Future<void> _applyNow() => AudioEffects.apply(
+        bands: bands,
+        equalizerEnabled: enabled.value,
+        mono: mono.value,
+      );
 
   /// Coalesce BOTH the Hive write and the mpv apply behind the debounce.
   /// Persisting per drag frame would fire dozens of Box.put calls a second —
@@ -103,6 +119,12 @@ class EqualizerController extends GetxController {
 
   void setEnabled(bool value) {
     enabled.value = value;
+    _persist();
+    _applyNow(); // immediate: a toggle should be heard at once
+  }
+
+  void setMono(bool value) {
+    mono.value = value;
     _persist();
     _applyNow(); // immediate: a toggle should be heard at once
   }

@@ -11,7 +11,7 @@ import 'services/app_paths.dart';
 import 'services/cloud/auth_service.dart';
 import 'services/cloud/sync_service.dart';
 import 'controllers/download_controller.dart';
-import 'controllers/equalizer_controller.dart';
+import 'controllers/audio_effects_controller.dart';
 import 'controllers/import_controller.dart';
 import 'controllers/lyrics_controller.dart';
 import 'controllers/player_controller.dart';
@@ -88,9 +88,9 @@ void main() async {
   Get.put(PlayerController(audioHandler: audioHandler));
   final lyricsController = Get.put(LyricsController());
 
-  // Equalizer state + persistence. Registered after the audio handler so the
-  // first apply has a player to talk to where one already exists.
-  final equalizerController = Get.put(EqualizerController());
+  // Equalizer + mono state and persistence. Registered after the audio handler
+  // so the first apply has a player to talk to where one already exists.
+  final audioEffectsController = Get.put(AudioEffectsController());
 
   // Drives the artwork → accent/base color theming used across the UI.
   Get.put(DynamicColorController());
@@ -127,8 +127,9 @@ ever(Get.find<PlayerController>().currentSong, (song) {
   }
 });
 
-// mpv keeps `af` across tracks, but the underlying platform player doesn't
-// exist yet at the points where we'd like to apply the chain: on desktop,
+// Both backends keep their equalizer settings across tracks, but neither's
+// underlying platform player exists yet at the points where we'd like to
+// apply them, so the settings have nowhere to land. On desktop,
 // PlaybackEngine.init() never calls setAudioSource, so just_audio's native
 // platform (and MediaKitPlayer with it) is only created by the FIRST
 // loadCurrent() — and audio_handler.dart's mediaItem.add(song) (which drives
@@ -136,15 +137,18 @@ ever(Get.find<PlayerController>().currentSong, (song) {
 // play path and restoreSession. So on cold start this hook alone finds no
 // player and reapply() is a no-op for track 1. The player can also be torn
 // down and recreated mid-session (e.g. AudioPlayer.stop() during
-// playback-error recovery), silently dropping the chain again. The second
-// worker below (on buttonState reaching `playing`) re-asserts once playback
-// has actually started, i.e. once the player is guaranteed to exist —
-// between the two hooks the chain always lands. Reapplying is idempotent
-// and cheap, so firing on every track change AND every play is fine.
+// playback-error recovery), silently dropping the chain again. Android has
+// the same shape of problem for a different reason: just_audio can't report
+// the device equalizer's bands until the effect activates with the platform
+// player, so a pre-playback apply times out and defers. The second worker
+// below (on buttonState reaching `playing`) re-asserts once playback has
+// actually started, i.e. once the player is guaranteed to exist — between
+// the two hooks the settings always land. Reapplying is idempotent and
+// cheap, so firing on every track change AND every play is fine.
 ever(Get.find<PlayerController>().currentSong,
-    (_) => equalizerController.reapply());
+    (_) => audioEffectsController.reapply());
 ever(Get.find<PlayerController>().buttonState, (state) {
-  if (state == PlayButtonState.playing) equalizerController.reapply();
+  if (state == PlayButtonState.playing) audioEffectsController.reapply();
 });
 
   runApp(const YTPlayerApp());

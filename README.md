@@ -8,6 +8,7 @@ A free and open-source music player with dynamic album-driven visuals, a floatin
 
 **No ads. No trackers. No accounts. No paywalls.** Every feature is available to everyone, forever — there is no paid tier and nothing is held back. Personalization (mixes, recommendations, taste profile) is computed entirely **on your device**; there is no backend server collecting your listening data. Cloud sync is optional and opt-in. The only thing the app ever reports is an anonymous, aggregate usage heartbeat — a random ID, platform, and app version, nothing more — fully documented in [Privacy & Anonymous Usage Stats](#privacy--anonymous-usage-stats).
 
+> **Note:** Gravity Music is a non-commercial, open-source client for educational and personal use. It hosts no audio and is not affiliated with YouTube, Google, Spotify, or Apple. See the [Disclaimer](#disclaimer) before using it.
 
 <img src="media/banner.png" alt="Gravity Music Banner" />
 
@@ -155,7 +156,7 @@ flutter build windows     # build the Windows release runner
 
 ## Architecture
 
-**All backend logic runs on-device** — search, recommendations, and mixes call YouTube Music's internal `youtubei` API directly; no external server is involved.
+**All backend logic runs on-device** — search, recommendations, and mixes call YouTube Music's `youtubei` endpoints directly from the client; there is no Gravity Music server in between.
 
 The playback stack is split into focused layers:
 
@@ -191,8 +192,16 @@ Note that the MIT license applies to this repository's code, not to the music it
 
 ## Disclaimer
 
-This project is built for learning and exploration, and is not affiliated with or endorsed by YouTube, Google, Spotify, or Apple.
+**Gravity Music is a non-commercial, open-source client published for educational and personal use.** It is provided free of charge, contains no advertising, and is not monetized in any way.
 
-Gravity Music streams audio from **YouTube** using YouTube's internal APIs and [`youtube_explode_dart`](https://pub.dev/packages/youtube_explode_dart). It does not host, store, or redistribute any audio or video content — all media is served directly from YouTube's CDN in real time, the same way a browser would.
+**No affiliation.** This project is not affiliated with, endorsed by, sponsored by, or in any way officially connected to YouTube, Google LLC, Spotify AB, Apple Inc., or any record label, artist, publisher, or rights holder. All product names, logos, trademarks, and brands are the property of their respective owners and are used here for identification purposes only.
 
-Use of this app may be subject to [YouTube's Terms of Service](https://www.youtube.com/t/terms). The author takes no responsibility for any ToS implications, misuse, or legal issues arising from the use of this software. **Use at your own risk.**
+**No hosting, no storage, no redistribution.** This repository contains **source code only**. There is no Gravity Music server, catalogue, index, or content library — nothing is hosted or distributed by this project. The app runs entirely on the end user's own device and plays media served directly by third-party platforms in real time, the same way a web browser does. Stream resolution uses YouTube's own endpoints via [`youtube_explode_dart`](https://pub.dev/packages/youtube_explode_dart); no audio passes through any infrastructure controlled by this project.
+
+**Playlist import** reads only the **public metadata** (track title and artist name) of a link the user supplies, then searches YouTube for a match. No audio is copied, transferred, converted, or extracted from Spotify or Apple Music, and no DRM is circumvented.
+
+**User responsibility.** Anyone who builds, installs, or runs this software does so at their own risk and is solely responsible for complying with the terms of any service they access through it — including [YouTube's Terms of Service](https://www.youtube.com/t/terms) — and with the copyright law of their jurisdiction. Downloading or retaining copyrighted material without the rights holder's permission may be unlawful where you live. The author accepts no liability for any misuse of this software or for any consequences arising from its use.
+
+**Rights holders.** If you are a copyright owner or an authorized representative and believe this project infringes your rights, please [open an issue](https://github.com/IamThejus/Gravity-Music/issues) or contact the maintainer through GitHub. Good-faith requests are reviewed and actioned promptly.
+
+**No warranty.** This software is provided "as is", without warranty of any kind, express or implied, as set out in the [MIT License](LICENSE).

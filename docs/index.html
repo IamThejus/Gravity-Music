@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gravity Music — Music, without gravity.</title>
+<title>Gravity Music</title>
+<meta name="description" content="A free and open-source music player for Android, Windows and Linux. No ads, no trackers, no accounts.">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -306,6 +310,16 @@
   .dl-btns .btn{ justify-content:center; padding:13px 28px; font-size:14px; }
   @media (max-width: 560px){ .dl-btns{ flex-direction:column; width:100%; } }
 
+  /* ---------- LEGAL ---------- */
+  .legal-panel{ padding: 34px 34px 30px; }
+  .legal-tag{ font-size:11.5px; letter-spacing:2px; text-transform:uppercase; color: var(--text-2); margin-bottom:14px; font-weight:700; }
+  .legal-panel p{ color: var(--text-1); font-size:13.5px; line-height:1.75; margin-bottom:12px; }
+  .legal-panel p:last-child{ margin-bottom:0; }
+  .legal-panel strong{ color: var(--text-0); font-weight:600; }
+  .legal-panel a{ color: var(--text-0); text-decoration:underline; text-underline-offset:3px; text-decoration-color: var(--glass-border); }
+  .legal-panel a:hover{ text-decoration-color: var(--accent); }
+  @media (max-width: 560px){ .legal-panel{ padding: 26px 22px; } }
+
   /* ---------- FOOTER ---------- */
   footer{ padding: 60px 0 140px; border-top:1px solid var(--glass-border-soft); margin-top:40px; }
   .foot-row{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:18px; }
@@ -348,7 +362,7 @@
     <div class="hero-copy reveal in">
       <div class="eyebrow">Gravity Music · Android &amp; Desktop</div>
       <h1 class="headline">Music,<br><span class="grad">without gravity.</span></h1>
-      <p class="sub">A free and open-source music player powered by YouTube, with on-device personalization, offline downloads, and a glassmorphism UI designed for those who appreciate the weight of every beat. No ads, no trackers, no paywalls.</p>
+      <p class="sub">A free and open-source music player that streams from YouTube, with on-device personalization, offline downloads, and a glassmorphism UI designed for those who appreciate the weight of every beat. No ads, no trackers, no paywalls.</p>
       <div class="hero-actions">
         <!-- Scrolls to the download section (all platforms) rather than
              deep-linking the APK — no js-dl-apk class, so the release-asset
@@ -508,8 +522,8 @@
       </div>
       <div class="privacy-tile glass reveal">
         <span class="mark">🛡</span>
-        <h3>No External Servers</h3>
-        <p>Search, recommendations, and mixes run entirely on your device. No data leaves your phone.</p>
+        <h3>No Servers of Ours</h3>
+        <p>Search, recommendations, and mixes are computed on your device. There is no Gravity Music backend collecting what you listen to.</p>
       </div>
       <div class="privacy-tile glass reveal">
         <span class="mark">⚡</span>
@@ -540,12 +554,26 @@
   </div>
 </section>
 
+<section class="section" id="legal">
+  <div class="wrap">
+    <div class="legal-panel glass reveal">
+      <div class="legal-tag">Disclaimer</div>
+      <p>Gravity Music is a <strong>non-commercial, open-source client</strong> published for educational and personal use. It is <strong>not affiliated with, endorsed by, or sponsored by</strong> YouTube, Google LLC, Spotify, Apple, or any record label, artist, or rights holder. All trademarks belong to their respective owners.</p>
+      <p>The project <strong>hosts no audio, stores no media, and redistributes no content</strong>. There is no Gravity Music server, catalogue, or index — the app is a client that runs entirely on your own device and plays media served directly by third-party platforms, in the same way a web browser does. This repository contains <strong>source code only</strong>, released under the MIT License.</p>
+      <p>Playlist import reads only the <strong>public metadata</strong> (track and artist names) of a link you supply. No audio is copied, transferred, or converted from Spotify or Apple Music.</p>
+      <p>Users are responsible for their own use of this software and for complying with the terms of any service they access through it, including <a href="https://www.youtube.com/t/terms">YouTube's Terms of Service</a> and the copyright law of their country. Downloading or retaining copyrighted material without permission may be unlawful where you live. <strong>Use at your own risk.</strong></p>
+      <p>Are you a rights holder with a concern about this project? Please open an issue or contact the maintainer via <a href="https://github.com/IamThejus/Gravity-Music">GitHub</a> — good-faith requests are actioned promptly.</p>
+    </div>
+  </div>
+</section>
+
 <footer>
   <div class="wrap foot-row">
     <div class="foot-brand"><span class="dot"></span>Gravity Music</div>
     <ul class="foot-links">
       <li><a href="https://github.com/IamThejus/Gravity-Music">GitHub</a></li>
       <li><a href="#privacy">Privacy</a></li>
+      <li><a href="#legal">Legal</a></li>
       <li><a href="#download">Download</a></li>
     </ul>
     <div class="foot-copy">Built in the open · IamThejus</div>

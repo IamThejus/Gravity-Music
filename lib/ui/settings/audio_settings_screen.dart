@@ -1,16 +1,21 @@
 // ui/settings/audio_settings_screen.dart
-// The app's first settings surface. Hosts the equalizer (desktop only, since
-// AudioEffects is a no-op elsewhere) and the loudness-normalization toggle,
-// which had no UI at all before this screen existed.
+// The app's first settings surface. Hosts the loudness-normalization toggle
+// (which had no UI at all before this screen existed), mono audio, and the
+// equalizer. Each tile asks AudioEffects whether its effect is available on
+// this platform rather than assuming — support genuinely differs, and a dead
+// control is worse than an absent one.
+
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hive/hive.dart';
 
-import '../../controllers/equalizer_controller.dart';
+import '../../controllers/audio_effects_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../services/audio_effects.dart';
 import '../../services/equalizer.dart';
+import '../../services/system_settings.dart';
 import '../app_theme.dart';
 import '../theme/glass.dart';
 
@@ -31,6 +36,10 @@ class AudioSettingsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.screenMargin),
         children: [
           const _NormalizationTile(),
+          if (_MonoTile.isVisible) ...[
+            const SizedBox(height: AppSpacing.gutter),
+            const _MonoTile(),
+          ],
           if (AudioEffects.isEqualizerSupported) ...[
             const SizedBox(height: AppSpacing.gutter),
             const _EqualizerSection(),
@@ -76,6 +85,62 @@ class _NormalizationTileState extends State<_NormalizationTile> {
   }
 }
 
+/// Mono audio, an accessibility setting: both channels through each speaker,
+/// so nothing is lost with single-sided hearing or one earbud in.
+///
+/// Two very different tiles behind one name, because the capability differs by
+/// platform. Desktop downmixes in-app (mpv filter graph). Android already
+/// provides mono system-wide under Accessibility and only lets a privileged
+/// app change it, so there the tile is an honest signpost to that screen
+/// rather than a switch that would lie about what it controls.
+class _MonoTile extends StatelessWidget {
+  const _MonoTile();
+
+  static bool get isVisible => AudioEffects.isMonoSupported || Platform.isAndroid;
+
+  static const _title = 'Mono audio';
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassContainer(
+      radius: AppRadius.lg,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: AudioEffects.isMonoSupported
+          ? _buildSwitch()
+          : _buildSystemLink(),
+    );
+  }
+
+  Widget _buildSwitch() {
+    final effects = Get.find<AudioEffectsController>();
+    return Obx(() => SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          activeThumbColor: AppColors.accent,
+          title: Text(_title, style: AppText.title(size: 16)),
+          subtitle: Text(
+            'Play both channels through every speaker',
+            style: AppText.title(size: 13, color: AppColors.textTertiary),
+          ),
+          value: effects.mono.value,
+          onChanged: effects.setMono,
+        ));
+  }
+
+  Widget _buildSystemLink() {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(_title, style: AppText.title(size: 16)),
+      subtitle: Text(
+        'Android controls this for every app. Open Accessibility settings',
+        style: AppText.title(size: 13, color: AppColors.textTertiary),
+      ),
+      trailing: const Icon(Icons.open_in_new_rounded,
+          color: AppColors.textTertiary, size: 20),
+      onTap: SystemSettings.openAccessibility,
+    );
+  }
+}
+
 class _EqualizerSection extends StatelessWidget {
   const _EqualizerSection();
 
@@ -83,7 +148,7 @@ class _EqualizerSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final eq = Get.find<EqualizerController>();
+    final eq = Get.find<AudioEffectsController>();
     return GlassContainer(
       radius: AppRadius.lg,
       padding: const EdgeInsets.all(16),

@@ -53,7 +53,17 @@ Split into focused layers, each single-responsibility — read the file-header c
 
 ### URL resolution (`checkNGetUrl`)
 
-Stream URLs resolve by priority: cached file → downloaded file (`DownloadsBox`, played as `file://` with NO network) → cached URL (`SongsUrlCache`, expiry checked via `expire=` param with a 30-min buffer) → fresh fetch. Fresh fetches run via `Isolate.run` (`services/background_task.dart` → `services/stream_service.dart`'s `StreamProvider`, using `youtube_explode_dart`) so the UI thread never blocks. Results are modeled by `HMStreamingData` (`models/hm_streaming_data.dart`), which holds low/high quality `Audio` and picks one from the user's `streamingQuality` pref.
+Stream URLs resolve by priority: cached file → downloaded file (`DownloadsBox`, played as `file://` with NO network) → cached URL (`SongsUrlCache`, expiry checked via `expire=` param with a 30-min buffer) → fresh fetch. Fresh fetches run via `Isolate.run` (`services/background_task.dart` → `services/stream_service.dart`'s `StreamProvider`) so the UI thread never blocks.
+
+**The resolver is the part most likely to break** — YouTube changes it deliberately. Read the header comment in `services/stream_service.dart` before touching it; the short version:
+
+- YouTube now **403s any stream URL whose `n` parameter isn't correctly deciphered** (it used to only throttle). Deciphering `n` requires running YouTube's player JS, which this app does not do.
+- So the resolver picks clients that **never emit an `n`**: `VISIONOS` first, then two `ANDROID_VR` build strings. Metrolist and Musify independently landed on the same set.
+- The **primary path calls youtubei `/player` directly** (`http`, not the library): one `sw.js_data` request for `visitorData` + one `/player` POST. No 1.2 MB watch page, so it's ~200-450ms and much lighter on rate limits — and it's the only path that yields per-format **`loudnessDb`**, which `volume_mixer.dart` needs.
+- **`visitorData` is load-bearing**: without it YouTube answers `LOGIN_REQUIRED` for many tracks. It's cached in `AppPrefs` under `ytVisitorData` and passed *into* the isolate (each `Isolate.run` is a fresh isolate, so it can't be cached in memory there).
+- **`youtube_explode_dart` (upstream, BSD-3) is the fallback only.** It fetches the watch page, so it carries a fuller session and recovers tracks the direct path can't — but it's slower and exposes no loudness (0 dB = "unknown" = no attenuation, which `volume_mixer` already handles). The old `anandnet` fork was removed; it had been dead since Jan 2025 and every client in it was broken.
+- If playback breaks again, suspect in order: stale client **version strings** (refresh from Metrolist's `YouTubeClient.kt`), a new PO-token requirement, or another `n` change.
+- `_prefetchNext()` pauses speculative prefetching for 2 minutes after a failed resolve — prefetching through failures is what turns one bad track into an IP-level rate-limit spiral. Results are modeled by `HMStreamingData` (`models/hm_streaming_data.dart`), which holds low/high quality `Audio` and picks one from the user's `streamingQuality` pref.
 
 ### Personalization stack (on-device recommendations & mixes)
 
@@ -107,6 +117,17 @@ GetX throughout — controllers registered via `Get.put`/`Get.find` in `main.dar
 - **`SyncService`** — GetX controller; Hive `LibraryBox` stays the source of truth. Sign-in pulls remote and **unions** into local, then pushes the merge; local mutations trigger a debounced full-state push.
 - **Gotcha:** Android reports an *unregistered SHA-1* (a signing/OAuth mismatch) using the same `canceled` code as a genuine user dismissal, so failures can look like "the button does nothing". Every `GoogleSignInException` is now `debugPrint`ed with `[auth]` — check logcat before assuming the code is wrong.
 - **Signing (SHA-1 stability):** release builds sign with a **stable, dedicated keystore** when `android/key.properties` is present (`android/app/build.gradle.kts` loads it; **falls back to the debug key when absent** so forks/contributors still build). This exists specifically to fix Google sign-in on CI builds: the debug keystore is generated per-machine, so a CI runner's SHA-1 never matched the one registered in the Google OAuth client. `key.properties` + `*.jks` are gitignored; CI writes them from encrypted secrets (`ANDROID_KEYSTORE_BASE64` / `_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD`) in the `android` job before `flutter build apk`. Register the release keystore's SHA-1 once in the Android OAuth client (keep the debug SHA-1 too for `flutter run`). Switching a device from a debug-signed to a release-signed APK requires an uninstall first (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`).
+
+### Feedback (anonymous, account-free)
+
+**`FeedbackService`** (`services/cloud/feedback_service.dart`) + `showFeedbackDialog()` (`ui/settings/feedback_dialog.dart`), reached from Settings → "Send feedback". Writes to the `public.feedback` table (`supabase/schema.sql`).
+
+- **Not tied to `auth.uid()`** — unlike `liked_songs`/`playlists`, feedback must work for users who never sign in. So the shipped anon key can write to this table, and it is locked down accordingly: **INSERT-only** (anon has no select/update/delete, so the public key can't scrape others' feedback) and **rate-limited to 5/hour per `installation_id`** by a `SECURITY DEFINER` trigger. Read submissions in the Supabase dashboard, which bypasses RLS.
+- **`name` is stored as SQL NULL when blank**, never the literal `'Anonymous'` — that keeps "chose not to say" distinguishable from someone actually named Anonymous, and leaves the display wording to the reader (`coalesce(name, 'Anonymous')`).
+- **The payload is an allowlist, built field by field**: name, message, `installation_id`, app_version, platform. No listening history, no video IDs, no stream URLs (those carry the user's IP and `visitorData`), no logs. Keep it that way — don't pass a shared context object in.
+- The Settings tile is **always visible** and never gated on `Get.isRegistered`/`isReady`. Settings can be built before the post-first-frame Supabase init finishes, and a bare readiness check never re-evaluates (the same trap documented for the Library account row). If the backend isn't up, the dialog says so.
+
+**`installationId()`** (`services/installation_id.dart`) is the shared anonymous per-install UUID used by both this and the heartbeat — one Hive key (`AppPrefs`/`installationId`), so the two can't drift apart. It identifies an *install*, never a person, and a reinstall produces a new one.
 
 ### Anonymous heartbeat analytics
 

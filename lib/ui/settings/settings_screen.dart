@@ -12,6 +12,7 @@ import '../app_theme.dart';
 import '../theme/glass.dart';
 import '../update/update_dialog.dart';
 import '../widgets/mini_player.dart';
+import 'feedback_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -99,6 +100,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : const Icon(Icons.chevron_right_rounded,
                         color: AppColors.textTertiary),
                 onTap: _checkForUpdates,
+              ),
+              // Always shown, never gated on Supabase being ready: this screen
+              // can be built before the post-first-frame cloud init finishes,
+              // and a bare Get.isRegistered/isReady check never re-evaluates
+              // (the same trap that once hid the Library account row). If the
+              // backend isn't up, FeedbackService says so in the dialog.
+              _SettingTile(
+                icon: Icons.forum_rounded,
+                iconColor: AppColors.accent,
+                title: 'Send feedback',
+                subtitle: 'Ideas, bugs, anything at all',
+                trailing: const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textTertiary),
+                onTap: showFeedbackDialog,
               ),
             ],
           ),

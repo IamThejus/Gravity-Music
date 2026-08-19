@@ -13,6 +13,7 @@
 // (wired from PlayerController).
 
 import 'dart:io';
+import 'dart:async';
 import 'dart:isolate';
 
 import 'package:audio_service/audio_service.dart';
@@ -387,17 +388,42 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   // Called after playByIndex so the next song's URL is already in Hive
   // cache when the user skips or the song ends — zero loading delay.
 
+  // Resolution failures are usually YouTube pushing back on this IP, not a
+  // problem with one specific track. Prefetching straight through a failure is
+  // what turns a single bad resolve into a rate-limit spiral: every skip fires
+  // another round of requests. Pause speculative work for a while instead —
+  // on-demand playback still resolves normally.
+  static const _prefetchCooldown = Duration(minutes: 2);
+  DateTime? _prefetchPausedUntil;
+
   void _prefetchNext() {
     try {
+      final pausedUntil = _prefetchPausedUntil;
+      if (pausedUntil != null && DateTime.now().isBefore(pausedUntil)) {
+        logD('url', 'prefetch skipped — cooling down after a failure');
+        return;
+      }
       final q = queue.value;
       // Shuffle-aware peek (non-mutating) so we warm the cache for the song
       // that will ACTUALLY play next, not just currentIndex + 1.
       final nextIdx = _queueMgr.peekNextIndex(q, currentIndex);
       if (nextIdx == null || nextIdx < 0 || nextIdx >= q.length) return;
-      final nextId = q[nextIdx].id;
-      // Fire and forget — just warms the cache
-      checkNGetUrl(nextId).catchError((_) {});
+      // Fire and forget — just warms the cache.
+      unawaited(_warmCache(q[nextIdx].id));
     } catch (_) {}
+  }
+
+  Future<void> _warmCache(String videoId) async {
+    try {
+      final data = await checkNGetUrl(videoId);
+      if (!data.playable) _pausePrefetch();
+    } catch (_) {
+      _pausePrefetch();
+    }
+  }
+
+  void _pausePrefetch() {
+    _prefetchPausedUntil = DateTime.now().add(_prefetchCooldown);
   }
 
   // ── URL resolution — mirrors HarmonyMusic's checkNGetUrl() ───────────────
@@ -465,9 +491,15 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     logD('url', 'checkNGetUrl($videoId): cache miss — fetching in isolate '
         '(newUrl=$generateNewUrl)');
     final token = RootIsolateToken.instance!;
+    // Reuse the anonymous youtubei session id across tracks: without it YouTube
+    // answers LOGIN_REQUIRED for many videos, and re-fetching it per track is a
+    // wasted round-trip. See StreamProvider.fetch().
+    final prefs = Hive.box('AppPrefs');
+    final cachedVisitor = prefs.get('ytVisitorData') as String?;
     final Map<String, dynamic> json;
     try {
-      json = await Isolate.run(() => getStreamInfo(videoId, token));
+      json = await Isolate.run(
+          () => getStreamInfo(videoId, token, cachedVisitor));
     } catch (e, st) {
       logD('url', 'checkNGetUrl($videoId): ISOLATE THREW — ${e.runtimeType}: $e');
       logD('url', st.toString());
@@ -477,6 +509,11 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     final url = data.audio?.url ?? '';
     logD('url', 'checkNGetUrl($videoId): playable=${data.playable} '
         'status="${data.statusMSG}" hasUrl=${url.isNotEmpty}');
+
+    final visitor = json['visitorData'] as String?;
+    if (visitor != null && visitor != cachedVisitor) {
+      prefs.put('ytVisitorData', visitor);
+    }
 
     if (data.playable) {
       urlCacheBox.put(videoId, json);

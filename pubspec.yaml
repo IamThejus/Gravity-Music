@@ -29,11 +29,11 @@ dependencies:
   media_kit_libs_windows_audio: ^1.0.9   # bundles libmpv DLLs for the Windows build
   audio_service_mpris: ^1.0.0-beta.1
 
-  # YouTube stream extraction (same forked version as HarmonyMusic)
-  youtube_explode_dart:
-    git:
-      url: https://github.com/anandnet/youtube_explode_dart.git
-      ref: 1d9ec9baa806705b1d859260eeb389ec28c6b024
+  # YouTube stream extraction. Upstream (BSD-3-Clause) rather than the old
+  # anandnet fork, which stopped working in 2026 — see the resolver notes in
+  # services/stream_service.dart. Used as the FALLBACK path only; the primary
+  # resolver talks to youtubei directly.
+  youtube_explode_dart: ^3.1.0
 
   # Local caching
   hive: ^2.2.3

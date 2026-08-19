@@ -32,14 +32,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
-import 'dart:math';
 
 import 'package:get/get.dart';
-import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../controllers/player_controller.dart';
+import 'installation_id.dart';
 
 class HeartbeatService extends GetxController {
   static const _endpoint =
@@ -49,7 +48,6 @@ class HeartbeatService extends GetxController {
   /// AppPrefs key holding the anonymous installation UUID. Written exactly
   /// once per install; only cleared by uninstall / clear-data (which is the
   /// intended behaviour — a wiped app is a "new" anonymous install).
-  static const _idKey = 'installationId';
 
   Timer? _timer;
   Worker? _stateWorker;
@@ -93,7 +91,7 @@ class HeartbeatService extends GetxController {
             Uri.parse(_endpoint),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
-              'installation_id': _installationId(),
+              'installation_id': installationId(),
               'platform': Platform.operatingSystem,
               'app_version': await _appVersion(),
             }),
@@ -107,17 +105,6 @@ class HeartbeatService extends GetxController {
     }
   }
 
-  /// The anonymous installation UUID — created lazily on first use, then
-  /// permanent for the lifetime of the install.
-  String _installationId() {
-    final box = Hive.box('AppPrefs');
-    var id = box.get(_idKey) as String?;
-    if (id == null || id.isEmpty) {
-      id = _uuidV4();
-      box.put(_idKey, id);
-    }
-    return id;
-  }
 
   /// App version read from the platform package info (single source of truth
   /// with pubspec.yaml — never hardcoded). Cached after the first read.
@@ -132,17 +119,3 @@ class HeartbeatService extends GetxController {
   }
 }
 
-/// RFC 4122 version-4 UUID from a cryptographically secure RNG. Kept local
-/// (~10 lines) rather than pulling the `uuid` package in as a direct
-/// dependency for one call. Being pure random output, the ID carries zero
-/// information about the user or device.
-String _uuidV4() {
-  final rng = Random.secure();
-  final b = List<int>.generate(16, (_) => rng.nextInt(256));
-  b[6] = (b[6] & 0x0f) | 0x40; // version 4
-  b[8] = (b[8] & 0x3f) | 0x80; // RFC 4122 variant
-  String hex(int i) => b[i].toRadixString(16).padLeft(2, '0');
-  return '${hex(0)}${hex(1)}${hex(2)}${hex(3)}-'
-      '${hex(4)}${hex(5)}-${hex(6)}${hex(7)}-'
-      '${hex(8)}${hex(9)}-${hex(10)}${hex(11)}${hex(12)}${hex(13)}${hex(14)}${hex(15)}';
-}

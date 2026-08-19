@@ -270,6 +270,7 @@
   .desktop-shot{ border-radius: var(--radius-lg); overflow:hidden; border:1px solid var(--glass-border-soft); }
   .desktop-shot img{ display:block; width:100%; height:auto; }
   .desktop-shot .ds-label{ padding:14px 20px; font-size:13px; color:var(--text-2); font-weight:500; background: var(--glass-bg); border-top:1px solid var(--glass-border-soft); }
+  .auto-pair{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
 
   /* ---------- CONTRIBUTORS ---------- */
   .contrib-grid{ display:flex; flex-wrap:wrap; gap:16px; }
@@ -331,6 +332,115 @@
   .foot-copy{ color: var(--text-2); font-size:12.5px; }
 
   @media (max-width: 760px){ footer{ padding-bottom:120px; } }
+
+  /* ============================================================
+     MOBILE / SMALL-SCREEN LAYOUT
+     Appended last on purpose: these rules refine the per-component
+     breakpoints above, so they must win on equal specificity.
+     ============================================================ */
+
+  /* ---- bottom nav dock ----
+     On phones the pill moves to the bottom. Five links + the CTA measured
+     ~565px, wider than a 360-390px viewport — and because body has
+     overflow-x:hidden the overflow was silently *clipped* rather than
+     scrollable, so "Features" and "Get the app" fell off both edges. */
+  @media (max-width: 760px){
+    .nav-outer{ padding: 0 10px; }
+    /* Denser fill than the desktop pill (.55). The dock is fixed at the bottom,
+       where the floating hero mockups (floatB, ±18px / 7.5s) and the ambient
+       blobs drift right behind it — through a 55%-opaque backdrop-filter that
+       motion shows up as the pill's fill and top highlight sliding, which reads
+       as the bar itself moving up and down. The bar is pixel-static; only its
+       backdrop was moving. A denser fill stops the swim. */
+    nav.glass{ padding:8px; max-width:100%; background: rgba(8,8,12,0.86); }
+    .nav-links{
+      gap:4px; max-width:100%;
+      overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none;
+      -webkit-overflow-scrolling:touch;
+    }
+    .nav-links::-webkit-scrollbar{ display:none; }
+    .nav-links li{ flex:0 0 auto; }
+    .nav-links a{ display:block; padding:9px 13px; white-space:nowrap; }
+  }
+  @media (max-width: 560px){
+    .nav-outer{ bottom:14px; }
+    .nav-links a{ padding:9px 10px; font-size:11.5px; }
+    /* "Download" is already a link in the dock, so the CTA is redundant here —
+       and it was the single biggest contributor to the overflow. */
+    .nav-cta{ display:none; }
+    /* shortened label so all five links fit a 360px screen without scrolling */
+    .nav-links a[href="#android-auto"]{ font-size:0; }
+    .nav-links a[href="#android-auto"]::after{ content:'Auto'; font-size:11.5px; }
+  }
+
+  /* ---- reduced motion ----
+     Same drift is what a motion-sensitive user asked not to see. */
+  @media (prefers-reduced-motion: reduce){
+    .blob, .pf-back, .pf-front, .pf-side, .stat-live .js-stat-listening{ animation: none !important; }
+    .reveal{ transition-duration: .01ms; }
+    html{ scroll-behavior: auto; }
+  }
+
+  /* ---- global rhythm ---- */
+  @media (max-width: 760px){
+    .wrap{ padding: 0 20px; }
+    .section{ padding: 74px 0; }
+    .sec-head{ margin-bottom: 34px; }
+    .sec-sub{ font-size:15px; }
+  }
+
+  /* ---- hero ---- */
+  @media (max-width: 760px){
+    /* no top nav on mobile (it docks at the bottom), so the 150px of
+       clearance was just dead space above the headline */
+    .hero{ padding: 104px 0 76px; }
+    .hero p.sub{ font-size:16px; margin-top:20px; }
+    .hero-actions{ margin-top:30px; gap:10px; }
+    .hero-actions .btn{ flex:1 1 auto; justify-content:center; padding:14px 20px; }
+    .hero-meta{ gap:18px 22px; margin-top:34px; }
+    .hero-meta .stat-live strong{ font-size:26px; }
+  }
+  @media (max-width: 560px){
+    h1.headline{ letter-spacing:-1.6px; }
+    /* The three phone mocks are absolutely positioned with fixed offsets; at
+       ≤560 the 980px values (front at left:90px + 210px wide) ran past the
+       content box and the side mock collided with it. Re-anchor the front
+       frame to the centre and pin the outer two to the edges. */
+    .hero-visual{ height: 400px; margin-top:26px; }
+    .pf-front{ width:168px; height:350px; left:50%; margin-left:-84px; top:14px; }
+    .pf-back{ width:148px; height:308px; left:0; top:44px; }
+    .pf-side{ width:148px; height:308px; right:0; top:52px; }
+    .visual-glow{ width:300px; height:300px; }
+  }
+
+  /* ---- tiles / privacy ---- */
+  @media (max-width: 560px){
+    .tile{ padding: 26px 22px; }
+    .tile .icon{ width:44px; height:44px; margin-bottom:16px; }
+    .privacy-tile{ padding: 28px 22px; }
+    .showcase .glass{ padding:12px; }
+    .showcase-copy{ padding:0 2px; }
+    .showcase-copy h3{ font-size:22px; }
+  }
+
+  /* ---- android auto pair ---- */
+  @media (max-width: 560px){
+    .auto-pair{ grid-template-columns:1fr; }
+  }
+
+  /* ---- download panel ---- */
+  @media (max-width: 760px){
+    .download-panel{ padding: 40px 24px; gap:28px; }
+    .dl-left, .dl-right{ width:100%; }
+    .dl-btns .btn{ width:100%; }
+  }
+
+  /* ---- footer ---- */
+  @media (max-width: 560px){
+    footer{ padding: 44px 0 120px; }
+    .foot-row{ flex-direction:column; align-items:flex-start; gap:14px; }
+    .foot-links{ gap:18px; flex-wrap:wrap; }
+  }
 </style>
 </head>
 <body>
@@ -481,7 +591,7 @@
         <img src="auto-incar.webp" alt="Gravity Music on Android Auto in-car display">
         <div class="ds-label">In-car display</div>
       </div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+      <div class="auto-pair">
         <div class="desktop-shot glass">
           <img src="auto-playlists.webp" alt="Gravity Music Android Auto playlists">
           <div class="ds-label">Browse playlists</div>

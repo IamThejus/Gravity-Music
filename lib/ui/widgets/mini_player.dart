@@ -32,24 +32,84 @@ import '../ui_helpers.dart';
 /// docked at the bottom. The root dock (RootShell) is covered by pushed
 /// routes, so detail screens (playlist, liked, downloads, mixes) re-dock one
 /// here for continuity. Content should reserve ~96px of bottom padding.
-class ScreenWithMiniPlayer extends StatelessWidget {
+class ScreenWithMiniPlayer extends StatefulWidget {
   final Widget child;
-  const ScreenWithMiniPlayer({super.key, required this.child});
+
+  /// Shrink [child] so it ends above the mini-player instead of scrolling
+  /// underneath it.
+  ///
+  /// Needed by screens with a reorderable list: SliverReorderableList starts
+  /// auto-scrolling only when the dragged row nears the edge of its
+  /// *Scrollable*, and by default that edge is the bottom of the screen — so a
+  /// row could be dragged down behind the mini-player and get stuck there
+  /// instead of scrolling the list. Reserving the space moves the scroll
+  /// viewport's edge up to the top of the mini-player, so auto-scroll kicks in
+  /// exactly where the row would otherwise disappear.
+  ///
+  /// Screens that opt in must NOT also append a trailing spacer sliver, or the
+  /// gap is counted twice.
+  final bool reserveSpace;
+
+  const ScreenWithMiniPlayer({
+    super.key,
+    required this.child,
+    this.reserveSpace = false,
+  });
+
+  @override
+  State<ScreenWithMiniPlayer> createState() => _ScreenWithMiniPlayerState();
+}
+
+class _ScreenWithMiniPlayerState extends State<ScreenWithMiniPlayer> {
+  final GlobalKey _dockKey = GlobalKey();
+
+  /// Live height of the mini-player, including its safe-area padding. Measured
+  /// rather than hardcoded because the bar animates in and out (and is absent
+  /// entirely when nothing is playing), so any constant would be wrong most of
+  /// the time.
+  double _dockHeight = 0;
+
+  void _measure() {
+    if (!widget.reserveSpace) return;
+    final h = _dockKey.currentContext?.size?.height ?? 0;
+    if ((h - _dockHeight).abs() > 0.5 && mounted) {
+      setState(() => _dockHeight = h);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.reserveSpace) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+    }
     return Stack(
       children: [
-        child,
+        widget.reserveSpace
+            ? Padding(
+                padding: EdgeInsets.only(bottom: _dockHeight),
+                child: widget.child,
+              )
+            : widget.child,
         Positioned(
           left: 0,
           right: 0,
           bottom: 0,
-          child: SafeArea(
-            top: false,
-            child: const Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: MiniPlayer(),
+          // The bar resizes as it animates in/out; SizeChangedLayoutNotifier
+          // tells us each time so the reserved space tracks it.
+          child: NotificationListener<SizeChangedLayoutNotification>(
+            onNotification: (_) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+              return false;
+            },
+            child: SizeChangedLayoutNotifier(
+              child: SafeArea(
+                key: _dockKey,
+                top: false,
+                child: const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: MiniPlayer(),
+                ),
+              ),
             ),
           ),
         ),

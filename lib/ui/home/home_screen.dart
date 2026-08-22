@@ -9,6 +9,7 @@
 // Playback is delegated to PlayerController.playWithRecommendations / playAll.
 
 import 'package:get/get.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/player_controller.dart';
@@ -157,6 +158,9 @@ class HomeScreen extends StatelessWidget {
                     size: 190,
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => MixDetailScreen(mix: m))),
+                    // Long-press mirrors the track-row convention: quick
+                    // actions without leaving the screen.
+                    onLongPress: () => _showMixActions(context, m),
                   );
                 }).toList(),
               );
@@ -212,6 +216,68 @@ class _PlaylistsRow extends StatelessWidget {
 }
 
 /// Horizontal scrolling section with a header.
+/// Quick actions for a "Made For You" mix: play or shuffle its whole track
+/// list without opening the detail screen. Mixes carry their tracks inline, so
+/// this needs no extra request.
+void _showMixActions(BuildContext context, Mix mix) {
+  final pc = Get.find<PlayerController>();
+  final tracks = mix.tracks;
+
+  void run(void Function(List<MediaItem>) play) {
+    Navigator.pop(context);
+    if (tracks.isEmpty) {
+      Get.snackbar('Mix unavailable', 'This mix has no tracks right now.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.card,
+          colorText: AppColors.white,
+          duration: const Duration(seconds: 2));
+      return;
+    }
+    play(tracks.map((t) => t.toMediaItem()).toList());
+  }
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (sheetCtx) => GlassContainer(
+      radius: AppRadius.xl,
+      fill: AppColors.card.withOpacity(0.72),
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SheetHandle(),
+            const SizedBox(height: 8),
+            ListTile(
+              title: Text(mix.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.title(size: 15)),
+              subtitle: Text('${mix.trackCount} songs',
+                  style: AppText.subtitle(size: 13)),
+            ),
+            const Divider(height: 8, color: AppColors.glassBorder),
+            ListTile(
+              leading:
+                  const Icon(Icons.play_arrow_rounded, color: Colors.white),
+              title: Text('Play all', style: AppText.title(size: 15)),
+              onTap: () => run(pc.playAllMedia),
+            ),
+            ListTile(
+              leading: const Icon(Icons.shuffle_rounded, color: Colors.white),
+              title: Text('Shuffle play', style: AppText.title(size: 15)),
+              onTap: () => run(pc.playShuffledMedia),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class _Carousel extends StatelessWidget {
   final String title;
   final List<Widget> children;

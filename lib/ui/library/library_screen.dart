@@ -687,82 +687,222 @@ class _AccountRowState extends State<_AccountRow> {
 
 // ── Liked Songs ────────────────────────────────────────────────────────────
 
-class LikedSongsScreen extends StatelessWidget {
+/// Sort picker shared by Liked Songs and playlist detail, so the two can't
+/// drift apart. Shows a radio mark against the active mode.
+class PlaylistSortMenu extends StatelessWidget {
+  final PlaylistSort current;
+  final ValueChanged<PlaylistSort> onSelected;
+
+  const PlaylistSortMenu(
+      {super.key, required this.current, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<PlaylistSort>(
+      icon: const Icon(Icons.sort_rounded, color: Colors.white),
+      tooltip: 'Sort',
+      color: AppColors.card,
+      initialValue: current,
+      onSelected: onSelected,
+      itemBuilder: (_) => [
+        for (final mode in PlaylistSort.values)
+          PopupMenuItem(
+            value: mode,
+            child: Row(
+              children: [
+                Icon(
+                  mode == current
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  size: 18,
+                  color: mode == current
+                      ? AppColors.accent
+                      : AppColors.textTertiary,
+                ),
+                const SizedBox(width: 10),
+                Text(mode.label, style: AppText.title(size: 14)),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class LikedSongsScreen extends StatefulWidget {
   const LikedSongsScreen({super.key});
+
+  @override
+  State<LikedSongsScreen> createState() => _LikedSongsScreenState();
+}
+
+class _LikedSongsScreenState extends State<LikedSongsScreen> {
+  late PlaylistSort _sort =
+      LibraryService.getPlaylistSort(LibraryService.likedSortKey);
+
+  void _setSort(PlaylistSort next) {
+    if (next == _sort) return;
+    LibraryService.setPlaylistSort(LibraryService.likedSortKey, next);
+    setState(() => _sort = next);
+  }
 
   @override
   Widget build(BuildContext context) {
     final pc = Get.find<PlayerController>();
     final liked = LibraryService.getLiked();
+    // Liked songs are stored newest-first (like() inserts at 0), unlike
+    // playlists which append — apply() needs telling so untimestamped entries
+    // don't sort backwards.
+    final visible = _sort.apply(liked, storedNewestFirst: true);
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
       body: ScreenWithMiniPlayer(
+        reserveSpace: true,
         child: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            backgroundColor: AppColors.canvas,
-            pinned: true,
-            leading: const AppBackButton(),
-            title: Text('Liked Songs', style: AppText.title(size: 18)),
-            actions: [
-              if (liked.isNotEmpty)
-                IconButton(
-                  icon: const Icon(Icons.play_circle_fill_rounded,
-                      color: Colors.white, size: 30),
-                  onPressed: () => pc.playAllMedia(
-                      liked.map((t) => t.toMediaItem()).toList()),
+          slivers: [
+            SliverAppBar(
+              backgroundColor: AppColors.canvas,
+              pinned: true,
+              leading: const AppBackButton(),
+              title: Text('Liked Songs', style: AppText.title(size: 18)),
+              actions: [
+                if (liked.isNotEmpty)
+                  PlaylistSortMenu(current: _sort, onSelected: _setSort),
+              ],
+            ),
+            if (liked.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: EmptyState(
+                  icon: Icons.favorite_border_rounded,
+                  title: 'No liked songs',
+                  message: 'Tap the heart on any track to save it here.',
+                ),
+              )
+            else ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.screenMargin, 8,
+                      AppSpacing.screenMargin, AppSpacing.gutter),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: PrimaryButton(
+                          label: 'Play',
+                          icon: Icons.play_arrow_rounded,
+                          onTap: () => pc.playAllMedia(
+                              visible.map((t) => t.toMediaItem()).toList()),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.gutter),
+                      Expanded(
+                        child: SecondaryButton(
+                          label: 'Shuffle',
+                          icon: Icons.shuffle_rounded,
+                          onTap: () => pc.playShuffledMedia(
+                              visible.map((t) => t.toMediaItem()).toList()),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_sort == PlaylistSort.custom)
+                SliverReorderableList(
+                  itemCount: visible.length,
+                  onReorder: (oldIndex, newIndex) {
+                    LibraryService.reorderLiked(oldIndex, newIndex);
+                    setState(() {});
+                  },
+                  itemBuilder: (context, i) => _likedRow(
+                    context,
+                    pc: pc,
+                    tracks: visible,
+                    index: i,
+                    reorderable: true,
+                    onChanged: () => setState(() {}),
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => _likedRow(
+                      context,
+                      pc: pc,
+                      tracks: visible,
+                      index: i,
+                      reorderable: false,
+                      onChanged: () => setState(() {}),
+                    ),
+                    childCount: visible.length,
+                  ),
                 ),
             ],
-          ),
-          if (liked.isEmpty)
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: EmptyState(
-                icon: Icons.favorite_border_rounded,
-                title: 'No liked songs',
-                message: 'Tap the heart on any track to save it here.',
-              ),
-            )
-          else
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, i) {
-                  final t = liked[i];
-                  return SwipeToQueue(
-                    slot: i,
-                    videoId: t.videoId,
-                    title: t.title,
-                    artist: t.artist,
-                    thumbnail: t.thumbnail,
-                    duration: t.durationValue,
-                    child: TrackTile(
-                      imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
-                      title: t.title,
-                      subtitle: t.artist,
-                      onTap: () => pc.playAllMedia(
-                          liked.map((x) => x.toMediaItem()).toList(),
-                          startIndex: i),
-                      onLongPress: () => showTrackActionsSheet(
-                        context,
-                        videoId: t.videoId,
-                        title: t.title,
-                        artist: t.artist,
-                        thumbnail: t.thumbnail,
-                        duration: t.durationValue,
-                      ),
-                    ),
-                  );
-                },
-                childCount: liked.length,
-              ),
-            ),
-          const SliverToBoxAdapter(child: SizedBox(height: 96)),
-        ],
+          ],
         ),
       ),
     );
   }
+}
+
+/// A liked-songs row. Mirrors [_playlistRow] but unlikes instead of removing
+/// from a playlist.
+Widget _likedRow(
+  BuildContext context, {
+  required PlayerController pc,
+  required List<LibraryTrack> tracks,
+  required int index,
+  required bool reorderable,
+  required VoidCallback onChanged,
+}) {
+  final t = tracks[index];
+  return SwipeToQueue(
+    key: ValueKey('liked-row-${t.videoId}'),
+    slot: index,
+    videoId: t.videoId,
+    title: t.title,
+    artist: t.artist,
+    thumbnail: t.thumbnail,
+    duration: t.durationValue,
+    child: TrackTile(
+      imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
+      title: t.title,
+      subtitle: t.artist,
+      onTap: () => pc.playAllMedia(
+          tracks.map((x) => x.toMediaItem()).toList(),
+          startIndex: index),
+      onLongPress: () => showTrackActionsSheet(
+        context,
+        videoId: t.videoId,
+        title: t.title,
+        artist: t.artist,
+        thumbnail: t.thumbnail,
+        duration: t.durationValue,
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.favorite_rounded, color: AppColors.accent),
+            onPressed: () {
+              LibraryService.unlike(t.videoId);
+              onChanged();
+            },
+          ),
+          if (reorderable)
+            ReorderableDragStartListener(
+              index: index,
+              child: const Padding(
+                padding: EdgeInsets.only(right: 4),
+                child: Icon(Icons.drag_handle_rounded,
+                    color: AppColors.textTertiary),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 // ── Playlist detail ──────────────────────────────────────────────────────────
@@ -776,6 +916,14 @@ class PlaylistDetailScreen extends StatefulWidget {
 }
 
 class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
+  late PlaylistSort _sort = LibraryService.getPlaylistSort(widget.playlistId);
+
+  void _setSort(PlaylistSort next) {
+    if (next == _sort) return;
+    LibraryService.setPlaylistSort(widget.playlistId, next);
+    setState(() => _sort = next);
+  }
+
   LocalPlaylist? get _playlist {
     final all = LibraryService.getPlaylists();
     final i = all.indexWhere((p) => p.id == widget.playlistId);
@@ -794,9 +942,14 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       );
     }
 
+    // What the user sees. The stored order is untouched by sorting; only
+    // drag-and-drop rewrites it.
+    final visible = _sort.apply(pl.tracks);
+
     return Scaffold(
       backgroundColor: AppColors.canvas,
       body: ScreenWithMiniPlayer(
+        reserveSpace: true,
         child: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -805,6 +958,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             expandedHeight: 300,
             leading: const AppBackButton(),
             actions: [
+              PlaylistSortMenu(current: _sort, onSelected: _setSort),
               _PlaylistDownloadAction(playlist: pl),
               IconButton(
                 icon: const Icon(Icons.delete_outline_rounded,
@@ -865,7 +1019,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                         label: 'Play',
                         icon: Icons.play_arrow_rounded,
                         onTap: () => pc.playAllMedia(
-                            pl.tracks.map((t) => t.toMediaItem()).toList()),
+                            visible.map((t) => t.toMediaItem()).toList()),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.gutter),
@@ -874,62 +1028,122 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                         label: 'Shuffle',
                         icon: Icons.shuffle_rounded,
                         onTap: () => pc.playShuffledMedia(
-                            pl.tracks.map((t) => t.toMediaItem()).toList()),
+                            visible.map((t) => t.toMediaItem()).toList()),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, i) {
-                  final t = pl.tracks[i];
-                  return SwipeToQueue(
-                    slot: i,
-                    videoId: t.videoId,
-                    title: t.title,
-                    artist: t.artist,
-                    thumbnail: t.thumbnail,
-                    duration: t.durationValue,
-                    child: TrackTile(
-                      imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
-                      title: t.title,
-                      subtitle: t.artist,
-                      onLongPress: () => showTrackActionsSheet(
-                        context,
-                        videoId: t.videoId,
-                        title: t.title,
-                        artist: t.artist,
-                        thumbnail: t.thumbnail,
-                        duration: t.durationValue,
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.remove_circle_outline_rounded,
-                            color: AppColors.textTertiary),
-                        onPressed: () {
-                          LibraryService.removeTrackFromPlaylist(
-                              pl.id, t.videoId);
-                          setState(() {});
-                        },
-                      ),
-                      onTap: () => pc.playAllMedia(
-                          pl.tracks.map((x) => x.toMediaItem()).toList(),
-                          startIndex: i),
-                    ),
-                  );
+            // `visible` is what the user sees; the stored order is only ever
+            // edited by drag-and-drop, which is offered in custom mode alone —
+            // reordering a date-sorted view would have no meaning to persist.
+            if (_sort == PlaylistSort.custom)
+              SliverReorderableList(
+                itemCount: visible.length,
+                onReorder: (oldIndex, newIndex) {
+                  LibraryService.reorderPlaylistTracks(
+                      pl.id, oldIndex, newIndex);
+                  setState(() {});
                 },
-                childCount: pl.tracks.length,
+                itemBuilder: (context, i) => _playlistRow(
+                  context,
+                  pc: pc,
+                  playlistId: pl.id,
+                  tracks: visible,
+                  index: i,
+                  reorderable: true,
+                  onChanged: () => setState(() {}),
+                ),
+              )
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => _playlistRow(
+                    context,
+                    pc: pc,
+                    playlistId: pl.id,
+                    tracks: visible,
+                    index: i,
+                    reorderable: false,
+                    onChanged: () => setState(() {}),
+                  ),
+                  childCount: visible.length,
+                ),
               ),
-            ),
           ],
-          SliverToBoxAdapter(
-              child: SizedBox(height: bottomDockInset(context))),
         ],
         ),
       ),
     );
   }
+}
+
+/// One playlist row. Shared by the reorderable (custom order) and plain
+/// (date-sorted) lists so the two views can't drift apart.
+///
+/// The row carries its own key because SliverReorderableList requires one per
+/// item; videoId is unique within a playlist (adds are de-duplicated), so it is
+/// stable across a reorder in a way an index never would be.
+Widget _playlistRow(
+  BuildContext context, {
+  required PlayerController pc,
+  required String playlistId,
+  required List<LibraryTrack> tracks,
+  required int index,
+  required bool reorderable,
+  required VoidCallback onChanged,
+}) {
+  final t = tracks[index];
+  return SwipeToQueue(
+    key: ValueKey('pl-row-${t.videoId}'),
+    slot: index,
+    videoId: t.videoId,
+    title: t.title,
+    artist: t.artist,
+    thumbnail: t.thumbnail,
+    duration: t.durationValue,
+    child: TrackTile(
+      imageUrl: sizedThumb(t.thumbnail, ThumbnailSize.tile),
+      title: t.title,
+      subtitle: t.artist,
+      onLongPress: () => showTrackActionsSheet(
+        context,
+        videoId: t.videoId,
+        title: t.title,
+        artist: t.artist,
+        thumbnail: t.thumbnail,
+        duration: t.durationValue,
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.remove_circle_outline_rounded,
+                color: AppColors.textTertiary),
+            onPressed: () {
+              LibraryService.removeTrackFromPlaylist(playlistId, t.videoId);
+              onChanged();
+            },
+          ),
+          // Drag from the handle only: a whole-row drag would fight the
+          // swipe-to-queue gesture on the same row.
+          if (reorderable)
+            ReorderableDragStartListener(
+              index: index,
+              child: const Padding(
+                padding: EdgeInsets.only(right: 4),
+                child: Icon(Icons.drag_handle_rounded,
+                    color: AppColors.textTertiary),
+              ),
+            ),
+        ],
+      ),
+      onTap: () => pc.playAllMedia(
+          tracks.map((x) => x.toMediaItem()).toList(),
+          startIndex: index),
+    ),
+  );
 }
 
 // ── Downloads ────────────────────────────────────────────────────────────────

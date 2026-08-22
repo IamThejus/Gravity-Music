@@ -17,13 +17,29 @@ class LibraryTrack {
   final String thumbnail;
   final String duration;
 
+  /// When this track was added to the playlist it belongs to. Null for tracks
+  /// saved before this field existed (and for liked songs, which keep their own
+  /// ordering) — sorting treats null as "older than anything timestamped",
+  /// which is true, and falls back to stored order among themselves.
+  final DateTime? addedAt;
+
   const LibraryTrack({
     required this.videoId,
     required this.title,
     required this.artist,
     required this.thumbnail,
     required this.duration,
+    this.addedAt,
   });
+
+  LibraryTrack copyWith({DateTime? addedAt}) => LibraryTrack(
+        videoId: videoId,
+        title: title,
+        artist: artist,
+        thumbnail: thumbnail,
+        duration: duration,
+        addedAt: addedAt ?? this.addedAt,
+      );
 
   Duration get durationValue {
     try {
@@ -40,6 +56,8 @@ class LibraryTrack {
         'artist': artist,
         'thumbnail': thumbnail,
         'duration': duration,
+        // Omitted when null so existing rows round-trip byte-identically.
+        if (addedAt != null) 'addedAt': addedAt!.millisecondsSinceEpoch,
       };
 
   factory LibraryTrack.fromMap(Map m) => LibraryTrack(
@@ -48,6 +66,9 @@ class LibraryTrack {
         artist: m['artist'] ?? '',
         thumbnail: m['thumbnail'] ?? '',
         duration: m['duration'] ?? '',
+        addedAt: m['addedAt'] is int
+            ? DateTime.fromMillisecondsSinceEpoch(m['addedAt'] as int)
+            : null,
       );
 }
 
@@ -119,11 +140,31 @@ class LibraryService {
   static void like(LibraryTrack track) {
     final liked = getLiked();
     if (!liked.any((t) => t.videoId == track.videoId)) {
-      liked.insert(0, track); // newest first
+      // Stamped so sorting is exact going forward; older entries fall back to
+      // stored position (see PlaylistSort.apply's storedNewestFirst).
+      final stamped =
+          track.addedAt == null ? track.copyWith(addedAt: DateTime.now()) : track;
+      liked.insert(0, stamped); // newest first
       _box.put('liked', liked.map((t) => t.toMap()).toList());
       _notify();
     }
   }
+
+  /// Move a liked song within the stored (custom) order.
+  static void reorderLiked(int oldIndex, int newIndex) {
+    final liked = getLiked();
+    if (oldIndex < 0 || oldIndex >= liked.length) return;
+    if (newIndex > oldIndex) newIndex -= 1;
+    newIndex = newIndex.clamp(0, liked.length - 1);
+    if (newIndex == oldIndex) return;
+    liked.insert(newIndex, liked.removeAt(oldIndex));
+    _box.put('liked', liked.map((t) => t.toMap()).toList());
+    _notify();
+  }
+
+  /// Liked songs share the per-playlist sort store under a reserved key — it
+  /// can't collide with a real playlist id (those are epoch-millis strings).
+  static const String likedSortKey = '__liked__';
 
   static void unlike(String videoId) {
     final liked = getLiked()..removeWhere((t) => t.videoId == videoId);
@@ -196,6 +237,7 @@ class LibraryService {
   static void deletePlaylist(String id) {
     final all = getPlaylists()..removeWhere((p) => p.id == id);
     _savePlaylists(all);
+    _clearPlaylistSort(id);
   }
 
   static void renamePlaylist(String id, String newName) {
@@ -211,7 +253,12 @@ class LibraryService {
     if (idx == -1) return;
     final pl = all[idx];
     if (!pl.tracks.any((t) => t.videoId == track.videoId)) {
-      all[idx] = pl.copyWith(tracks: [...pl.tracks, track]);
+      // Stamp the add time here rather than at every call site, so "sort by
+      // date added" works no matter where the track came from.
+      final stamped = track.addedAt == null
+          ? track.copyWith(addedAt: DateTime.now())
+          : track;
+      all[idx] = pl.copyWith(tracks: [...pl.tracks, stamped]);
       _savePlaylists(all);
     }
   }
@@ -224,5 +271,108 @@ class LibraryService {
     all[idx] = pl.copyWith(
         tracks: pl.tracks.where((t) => t.videoId != videoId).toList());
     _savePlaylists(all);
+  }
+
+  /// Move a track within a playlist. [oldIndex]/[newIndex] are positions in the
+  /// playlist's stored (custom) order — callers showing a sorted view must map
+  /// back to stored indices first, which is why drag is only offered in
+  /// [PlaylistSort.custom].
+  static void reorderPlaylistTracks(
+      String playlistId, int oldIndex, int newIndex) {
+    final all = getPlaylists();
+    final idx = all.indexWhere((p) => p.id == playlistId);
+    if (idx == -1) return;
+    final tracks = [...all[idx].tracks];
+    if (oldIndex < 0 || oldIndex >= tracks.length) return;
+    // ReorderableList reports newIndex in the pre-removal coordinate space.
+    if (newIndex > oldIndex) newIndex -= 1;
+    newIndex = newIndex.clamp(0, tracks.length - 1);
+    if (newIndex == oldIndex) return;
+    tracks.insert(newIndex, tracks.removeAt(oldIndex));
+    all[idx] = all[idx].copyWith(tracks: tracks);
+    _savePlaylists(all);
+  }
+
+  // ── Per-playlist sort preference ─────────────────────────────────────────
+  //
+  // Stored OUTSIDE LocalPlaylist (its own Hive key, keyed by playlist id) on
+  // purpose: LocalPlaylist.toMap() is the cloud-sync payload, and the remote
+  // `playlists` table has no column for this. Keeping it local means signing in
+  // can't clobber the user's view preference, and sync needs no migration.
+
+  static Map<String, String> _sortPrefs() {
+    final raw = _box.get('playlistSort', defaultValue: <dynamic, dynamic>{});
+    return Map<String, String>.from(raw as Map);
+  }
+
+  static PlaylistSort getPlaylistSort(String playlistId) =>
+      PlaylistSort.fromKey(_sortPrefs()[playlistId]);
+
+  static void setPlaylistSort(String playlistId, PlaylistSort sort) {
+    final prefs = _sortPrefs();
+    if (sort == PlaylistSort.custom) {
+      prefs.remove(playlistId); // default — don't store noise
+    } else {
+      prefs[playlistId] = sort.key;
+    }
+    _box.put('playlistSort', prefs);
+    // Deliberately no _notify(): this is a local view preference, not library
+    // data, so it must not trigger a cloud push.
+  }
+
+  /// Drop a playlist's saved sort preference (called when it's deleted).
+  static void _clearPlaylistSort(String playlistId) {
+    final prefs = _sortPrefs()..remove(playlistId);
+    _box.put('playlistSort', prefs);
+  }
+}
+
+/// How a playlist's tracks are ordered on screen. [custom] is the stored order
+/// — what drag-and-drop edits; the others are views over it and leave the
+/// stored order untouched.
+enum PlaylistSort {
+  custom('custom', 'Custom order'),
+  newestAdded('newest', 'Newest added'),
+  oldestAdded('oldest', 'Oldest added');
+
+  final String key;
+  final String label;
+  const PlaylistSort(this.key, this.label);
+
+  static PlaylistSort fromKey(String? key) => values.firstWhere(
+        (v) => v.key == key,
+        orElse: () => PlaylistSort.custom,
+      );
+
+  /// Apply this ordering to [tracks] without mutating the input.
+  ///
+  /// Tracks saved before `addedAt` existed have no timestamp, but their stored
+  /// position still encodes add order (adds append). So each such track gets a
+  /// synthetic key of `index - length`: always negative, therefore always older
+  /// than any real epoch timestamp, while preserving their relative sequence.
+  /// That makes "Newest added" correctly reverse a legacy playlist instead of
+  /// leaving it untouched.
+  /// [storedNewestFirst] describes what stored position means for tracks with
+  /// no timestamp. Playlists append (index 0 = oldest), but liked songs are
+  /// inserted at the front (index 0 = newest), so the synthetic key has to be
+  /// flipped for them or legacy liked songs sort backwards.
+  List<LibraryTrack> apply(List<LibraryTrack> tracks,
+      {bool storedNewestFirst = false}) {
+    if (this == PlaylistSort.custom) return tracks;
+    final n = tracks.length;
+    final indexed = List.generate(n, (i) {
+      final ms = tracks[i].addedAt?.millisecondsSinceEpoch;
+      final synthetic = storedNewestFirst ? -i : (i - n);
+      return (i, tracks[i], ms ?? synthetic);
+    });
+    indexed.sort((a, b) {
+      var cmp = a.$3.compareTo(b.$3);
+      if (this == PlaylistSort.newestAdded) cmp = -cmp;
+      // Only reachable for identical real timestamps; keep stored order there
+      // (Dart's List.sort is not stable on its own).
+      if (cmp == 0) cmp = a.$1.compareTo(b.$1);
+      return cmp;
+    });
+    return [for (final e in indexed) e.$2];
   }
 }

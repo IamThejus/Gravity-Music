@@ -179,6 +179,10 @@ class ArtCard extends StatelessWidget {
   final String? overline; // e.g. "PLAYLIST"
   final VoidCallback onTap;
 
+  /// Optional long-press action — used for quick actions (e.g. play / shuffle
+  /// a mix without opening it).
+  final VoidCallback? onLongPress;
+
   const ArtCard({
     super.key,
     required this.imageUrl,
@@ -187,12 +191,14 @@ class ArtCard extends StatelessWidget {
     this.subtitle,
     this.overline,
     this.size = 150,
+    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: SizedBox(
         width: size,
         child: Column(

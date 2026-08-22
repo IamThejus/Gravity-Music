@@ -117,90 +117,113 @@ void showTrackActionsSheet(
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
+    // isScrollControlled is required: without it the sheet is capped at 9/16 of
+    // the screen height (Flutter's _defaultScrollControlDisabledMaxHeightRatio)
+    // and a Column that exceeds it is clipped with no way to scroll — which is
+    // what cut off the bottom actions.
+    isScrollControlled: true,
     builder: (sheetCtx) => GlassContainer(
       radius: AppRadius.xl,
       fill: AppColors.card.withOpacity(0.72),
-      padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SheetHandle(),
-          const SizedBox(height: 8),
-          // Track header
-          ListTile(
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              child: Container(
-                width: 46,
-                height: 46,
-                color: AppColors.glassFill,
-                child: thumbnail.isEmpty
-                    ? const Icon(Icons.music_note_rounded,
-                        color: AppColors.textTertiary)
-                    : Image.network(sizedThumb(thumbnail, ThumbnailSize.tile),
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(
-                            Icons.music_note_rounded,
-                            color: AppColors.textTertiary)),
-              ),
-            ),
-            title: Text(prettyTitle(title),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.title(size: 15)),
-            subtitle: Text(prettyTitle(artist),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.subtitle(size: 13)),
-          ),
-          const Divider(height: 8, color: AppColors.glassBorder),
-          ListTile(
-            leading:
-                const Icon(Icons.playlist_play_rounded, color: Colors.white),
-            title: Text('Play next', style: AppText.title(size: 15)),
-            onTap: () {
-              Navigator.pop(sheetCtx);
-              pc.playNext(videoId,
-                  title: title,
-                  artist: artist,
-                  thumbnail: thumbnail,
-                  duration: duration);
-              toast('Playing next', '“${prettyTitle(title)}” is up next');
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.queue_music_rounded, color: Colors.white),
-            title: Text('Add to queue', style: AppText.title(size: 15)),
-            onTap: () {
-              Navigator.pop(sheetCtx);
-              pc.addToUserQueue(videoId,
-                  title: title,
-                  artist: artist,
-                  thumbnail: thumbnail,
-                  duration: duration);
-              toast('Added to queue', '“${prettyTitle(title)}” added');
-            },
-          ),
-          ListTile(
-            leading:
-                const Icon(Icons.playlist_add_rounded, color: Colors.white),
-            title: Text('Add to playlist', style: AppText.title(size: 15)),
-            onTap: () {
-              Navigator.pop(sheetCtx);
-              showAddToPlaylistSheet(
-                context,
-                MediaItem(
-                  id: videoId,
-                  title: title,
-                  artist: artist,
-                  artUri: thumbnail.isNotEmpty ? Uri.tryParse(thumbnail) : null,
-                  duration: duration,
-                  extras: {'url': ''},
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+      // Never taller than 85% of the screen, and scrollable past that, so long
+      // titles or a future extra action can't push anything out of reach.
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(sheetCtx).size.height * 0.85,
+        ),
+        // Bottom safe-area padding keeps the last row clear of the gesture bar.
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SheetHandle(),
+                const SizedBox(height: 8),
+                // Track header
+                ListTile(
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    child: Container(
+                      width: 46,
+                      height: 46,
+                      color: AppColors.glassFill,
+                      child: thumbnail.isEmpty
+                          ? const Icon(Icons.music_note_rounded,
+                              color: AppColors.textTertiary)
+                          : Image.network(
+                              sizedThumb(thumbnail, ThumbnailSize.tile),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.music_note_rounded,
+                                  color: AppColors.textTertiary)),
+                    ),
+                  ),
+                  title: Text(prettyTitle(title),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.title(size: 15)),
+                  subtitle: Text(prettyTitle(artist),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.subtitle(size: 13)),
                 ),
-              );
-            },
+                const Divider(height: 8, color: AppColors.glassBorder),
+                ListTile(
+                  leading: const Icon(Icons.playlist_play_rounded,
+                      color: Colors.white),
+                  title: Text('Play next', style: AppText.title(size: 15)),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    pc.playNext(videoId,
+                        title: title,
+                        artist: artist,
+                        thumbnail: thumbnail,
+                        duration: duration);
+                    toast('Playing next', '“${prettyTitle(title)}” is up next');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.queue_music_rounded,
+                      color: Colors.white),
+                  title: Text('Add to queue', style: AppText.title(size: 15)),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    pc.addToUserQueue(videoId,
+                        title: title,
+                        artist: artist,
+                        thumbnail: thumbnail,
+                        duration: duration);
+                    toast('Added to queue', '“${prettyTitle(title)}” added');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.playlist_add_rounded,
+                      color: Colors.white),
+                  title:
+                      Text('Add to playlist', style: AppText.title(size: 15)),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    showAddToPlaylistSheet(
+                      context,
+                      MediaItem(
+                        id: videoId,
+                        title: title,
+                        artist: artist,
+                        artUri: thumbnail.isNotEmpty
+                            ? Uri.tryParse(thumbnail)
+                            : null,
+                        duration: duration,
+                        extras: {'url': ''},
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     ),
   );

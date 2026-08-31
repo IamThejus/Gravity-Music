@@ -442,6 +442,7 @@
     .foot-links{ gap:18px; flex-wrap:wrap; }
   }
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -486,7 +487,8 @@
              fetch succeeds so an unreachable backend never shows broken UI. -->
         <div class="js-stat-live stat-live"><strong class="js-stat-listening">0</strong>🎧 Listening now</div>
         <div class="js-stat-live stat-live"><strong class="js-stat-installs">0</strong>📱 Installations</div>
-        <div><strong>0</strong>Accounts required</div>
+        <div class="js-stat-live stat-live"><strong class="js-stat-users">0</strong>👥 Community members</div>
+        <div><strong>No</strong>Account required</div>
         <div><strong>100%</strong>Open source</div>
       </div>
     </div>
@@ -768,6 +770,44 @@
         </a>
       `).join('');
     } catch (_) {}
+  })();
+
+  // Optional accounts: this counts people who voluntarily signed up
+  // for Gravity Music cloud features. An account is never required.
+  (() => {
+    const SUPABASE_URL = 'https://gethkypfuewzuuvoidob.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_ONxHJd7VfDxal9XAjLSDIg_PDazJxTg';
+
+    const supabase = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
+
+    async function refreshCommunityMembers() {
+      try {
+        const { data, error } = await supabase.rpc('get_user_count');
+
+        if (error) {
+          console.error('Supabase user count error:', error);
+          return;
+        }
+
+        const count = Number(data) || 0;
+
+        document.querySelectorAll('.js-stat-users').forEach(el => {
+          el.textContent = count.toLocaleString();
+          el.dataset.v = count;
+        });
+
+        document.querySelectorAll('.js-stat-users').forEach(el => {
+          el.closest('.js-stat-live')?.classList.add('on');
+        });
+      } catch (error) {
+        console.error('Supabase user count error:', error);
+      }
+    }
+
+    refreshCommunityMembers();
   })();
 </script>
 

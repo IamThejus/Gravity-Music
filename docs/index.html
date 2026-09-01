@@ -148,9 +148,20 @@
   .btn-ghost{ background: var(--glass-bg); border-color: var(--glass-border); color: var(--text-0); backdrop-filter: blur(20px); }
   .btn-ghost:hover{ background: var(--glass-bg-strong); transform: translateY(-2px); }
 
-  .hero-meta{ display:flex; gap:26px; margin-top:46px; flex-wrap:wrap; align-items:flex-end; }
-  .hero-meta div{ font-size:12px; color:var(--text-2); }
-  .hero-meta strong{ display:block; font-size:20px; color:var(--text-0); font-weight:700; font-family:'Space Grotesk',sans-serif; }
+  /* Six stats on one shared 3-column grid: the three live heartbeat figures
+     on the top row, the three static facts beneath. All six used to sit in a
+     single wrapping flex row, so the break point drifted with the viewport
+     (5 + 1 at some widths). One grid rather than two separate rows so the
+     columns line up between them — and so that when the heartbeat is
+     unreachable and the live stats are display:none, the static three simply
+     move up into the top row with no phantom gap left behind. */
+  .hero-meta{
+    display:grid; grid-template-columns: repeat(3, minmax(0, max-content));
+    column-gap:52px; row-gap:30px; margin-top:46px;
+    justify-content:start; align-items:end;
+  }
+  .hero-meta > div{ font-size:12px; color:var(--text-2); line-height:1.45; }
+  .hero-meta strong{ display:block; margin-bottom:7px; font-size:20px; color:var(--text-0); font-weight:700; font-family:'Space Grotesk',sans-serif; }
 
   /* live heartbeat stats — bigger than the other meta items, revealed with a
      rise-in once the first fetch succeeds, numbers count up, and the
@@ -397,7 +408,7 @@
     .hero p.sub{ font-size:16px; margin-top:20px; }
     .hero-actions{ margin-top:30px; gap:10px; }
     .hero-actions .btn{ flex:1 1 auto; justify-content:center; padding:14px 20px; }
-    .hero-meta{ gap:18px 22px; margin-top:34px; }
+    .hero-meta{ column-gap:34px; row-gap:24px; margin-top:34px; }
     .hero-meta .stat-live strong{ font-size:26px; }
   }
   @media (max-width: 560px){
@@ -482,12 +493,13 @@
         <a class="btn btn-ghost" href="https://github.com/IamThejus/Gravity-Music">View Source</a>
       </div>
       <div class="hero-meta">
-        <div><strong class="js-version">v1.2.3</strong>Latest release</div>
-        <!-- Live anonymous stats from the heartbeat worker; hidden until the
-             fetch succeeds so an unreachable backend never shows broken UI. -->
+        <!-- Live anonymous stats from the heartbeat worker; each is hidden
+             until the fetch succeeds, and the row collapses with them so an
+             unreachable backend never shows broken UI. -->
         <div class="js-stat-live stat-live"><strong class="js-stat-listening">0</strong>🎧 Listening now</div>
         <div class="js-stat-live stat-live"><strong class="js-stat-installs">0</strong>📱 Installations</div>
         <div class="js-stat-live stat-live"><strong class="js-stat-users">0</strong>☁️ Cloud users</div>
+        <div><strong class="js-version">v1.2.3</strong>Latest release</div>
         <div><strong>No</strong>Account required</div>
         <div><strong>100%</strong>Open source</div>
       </div>

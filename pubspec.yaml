@@ -5,7 +5,7 @@ publish_to: 'none'
 # (v2.0.0 → 2.0.0) or the in-app updater misfires. versionCode = major*10000 +
 # minor*100 + patch, so it always increases with the semver — see "Releasing"
 # in CLAUDE.md.
-version: 2.2.0+22000
+version: 2.2.1+22001
 
 environment:
   sdk: ">=3.1.5 <4.0.0"

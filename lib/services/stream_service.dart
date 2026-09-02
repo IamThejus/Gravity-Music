@@ -137,6 +137,15 @@ class StreamProvider {
   final List<Audio>? audioFormats;
   final String statusMSG;
 
+  /// Raw playabilityStatus from the last client that refused the video
+  /// ('UNPLAYABLE', 'LOGIN_REQUIRED', …), or '' when the failure wasn't a
+  /// refusal. [statusMSG] is user-facing prose and is deliberately lossy —
+  /// when the direct chain says UNPLAYABLE but the fallback then trips a rate
+  /// limit, statusMSG describes the rate limit and the real cause is gone.
+  /// Callers that need to *act* on the cause (see TrackRematchService) must
+  /// read this instead.
+  final String lastStatus;
+
   /// visitorData actually used for this fetch, so the caller can cache it and
   /// hand it back next time instead of re-fetching sw.js_data every track.
   final String? visitorData;
@@ -145,6 +154,7 @@ class StreamProvider {
     required this.playable,
     this.audioFormats,
     this.statusMSG = '',
+    this.lastStatus = '',
     this.visitorData,
   });
 
@@ -187,7 +197,10 @@ class StreamProvider {
             'fetch($videoId): ${client.name} ${client.version} -> ${e.status}');
       } on SocketException {
         return StreamProvider(
-            playable: false, statusMSG: 'Network error', visitorData: visitor);
+            playable: false,
+            statusMSG: 'Network error',
+            lastStatus: lastStatus,
+            visitorData: visitor);
       } catch (e) {
         logD('stream',
             'fetch($videoId): ${client.name} failed — ${e.runtimeType}: $e');
@@ -195,6 +208,27 @@ class StreamProvider {
     }
 
     // ── Fallback: youtube_explode_dart (watch page = fuller session) ────────
+    //
+    // Skipped for a flat UNPLAYABLE. The distinction matters: LOGIN_REQUIRED
+    // means "this session isn't trusted", which the watch page can genuinely
+    // fix by carrying a fuller session — that's the whole reason the fallback
+    // exists. UNPLAYABLE is YouTube answering about the *video*, and every
+    // client agreeing on it is a definitive answer, not a session problem.
+    // Escalating anyway cost ~19s per attempt and a full 1.2MB watch-page
+    // fetch for a video that was never going to play, which is exactly how a
+    // single bad track in a playlist snowballed into an IP-level rate limit.
+    if (lastStatus == 'UNPLAYABLE') {
+      logD('stream',
+          'fetch($videoId): all clients said UNPLAYABLE — definitive, '
+              'skipping the watch-page fallback');
+      return StreamProvider(
+        playable: false,
+        statusMSG: 'This track is unavailable',
+        lastStatus: lastStatus,
+        visitorData: visitor,
+      );
+    }
+
     logD(
         'stream',
         'fetch($videoId): direct path exhausted (last="$lastStatus") — '
@@ -325,6 +359,7 @@ class StreamProvider {
       return StreamProvider(
           playable: false,
           statusMSG: _describe(e, lastStatus),
+          lastStatus: lastStatus,
           visitorData: visitor);
     } finally {
       yt.close();
@@ -391,6 +426,7 @@ class StreamProvider {
   Map<String, dynamic> get hmStreamingData => {
         'playable': playable,
         'statusMSG': statusMSG,
+        'lastStatus': lastStatus,
         'formats': rankedFormats.map((a) => a.toJson()).toList(),
         if (visitorData != null) 'visitorData': visitorData,
       };

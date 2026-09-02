@@ -1,11 +1,12 @@
 // ui/settings/feedback_dialog.dart
 //
-// "Send feedback" form — an optional name plus a message, posted to Supabase by
-// FeedbackService. Styled to match update_dialog.dart (Gravity's dark palette,
-// AppRadius.xl corners, accent-tinted leading icon).
+// "Send feedback" form — name, a category, and a message, posted to Supabase
+// by FeedbackService. Styled to match update_dialog.dart (Gravity's dark
+// palette, AppRadius.xl corners, accent-tinted leading icon).
 //
-// Leaving the name blank is a first-class choice, not an edge case: the field
-// says so, and the service stores NULL for it.
+// The category defaults to "Anything at all" so the form is never blocked on a
+// choice the user doesn't care to make — picking a category is a shortcut for
+// triage, not a question they must answer.
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -33,6 +34,7 @@ class _FeedbackDialogState extends State<FeedbackDialogBody> {
   final _name = TextEditingController();
   final _message = TextEditingController();
   final _messageFocus = FocusNode();
+  FeedbackCategory _category = FeedbackCategory.other;
   bool _sending = false;
   String? _error;
 
@@ -51,7 +53,8 @@ class _FeedbackDialogState extends State<FeedbackDialogBody> {
       _error = null;
     });
     try {
-      await FeedbackService.submit(name: _name.text, message: _message.text);
+      await FeedbackService.submit(
+          name: _name.text, category: _category, message: _message.text);
       if (!mounted) return;
       Get.back();
       Get.snackbar('Thanks!', 'Your feedback has been sent.',
@@ -126,11 +129,21 @@ class _FeedbackDialogState extends State<FeedbackDialogBody> {
                       _Field(
                         controller: _name,
                         enabled: !_sending,
-                        hint: 'Name (optional)',
+                        hint: 'Your name',
                         maxLength: FeedbackService.maxNameLength,
                         textInputAction: TextInputAction.next,
                         onSubmitted: (_) => _messageFocus.requestFocus(),
                       ),
+                      const SizedBox(height: 16),
+                      Text('What is this about?', style: AppText.subtitle()),
+                      const SizedBox(height: 6),
+                      for (final c in FeedbackCategory.values)
+                        _CategoryOption(
+                          category: c,
+                          selected: _category,
+                          enabled: !_sending,
+                          onChanged: (v) => setState(() => _category = v),
+                        ),
                       const SizedBox(height: 12),
                       _Field(
                         controller: _message,
@@ -201,6 +214,59 @@ class _FeedbackDialogState extends State<FeedbackDialogBody> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One radio row. The whole row is the hit target, not just the 20px circle —
+/// a bare [Radio] is well under the 48dp minimum and is awkward on a phone.
+class _CategoryOption extends StatelessWidget {
+  final FeedbackCategory category;
+  final FeedbackCategory selected;
+  final bool enabled;
+  final ValueChanged<FeedbackCategory> onChanged;
+
+  const _CategoryOption({
+    required this.category,
+    required this.selected,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected = category == selected;
+    return InkWell(
+      onTap: enabled ? () => onChanged(category) : null,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            Radio<FeedbackCategory>(
+              value: category,
+              groupValue: selected,
+              onChanged: enabled ? (v) => onChanged(v!) : null,
+              activeColor: AppColors.accent,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
+            const SizedBox(width: 6),
+            // Expanded, not a bare Text: "Anything at all" overflows the row
+            // on a narrow phone otherwise (caught by the dialog widget tests).
+            Expanded(
+              child: Text(
+                category.label,
+                style: AppText.title(
+                  size: 15,
+                  color:
+                      isSelected ? AppColors.white : AppColors.textSecondaryHi,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

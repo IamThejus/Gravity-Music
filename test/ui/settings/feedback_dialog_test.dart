@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:saragama/services/cloud/feedback_service.dart';
 import 'package:saragama/ui/settings/feedback_dialog.dart';
 
 /// Regression test for: "the feedback form shortens when the keyboard is
@@ -64,6 +65,48 @@ void main() {
       expect(r.top, greaterThanOrEqualTo(0.0));
       expect(r.bottom, lessThanOrEqualTo(keyboardTop));
     }
+  });
+
+  group('category radios', () {
+    testWidgets('offers every category, defaulting to "Anything at all"',
+        (tester) async {
+      await pumpWith(tester, EdgeInsets.zero);
+
+      for (final c in FeedbackCategory.values) {
+        expect(find.text(c.label), findsOneWidget);
+      }
+
+      final selected = tester
+          .widgetList<Radio<FeedbackCategory>>(
+              find.byType(Radio<FeedbackCategory>))
+          .where((r) => r.value == r.groupValue)
+          .toList();
+      expect(selected, hasLength(1),
+          reason: 'exactly one option must be preselected');
+      expect(selected.single.value, FeedbackCategory.other,
+          reason: 'the form must never be blocked on picking a category');
+    });
+
+    testWidgets('tapping the label selects that category, not just the circle',
+        (tester) async {
+      await pumpWith(tester, EdgeInsets.zero);
+
+      await tester.tap(find.text(FeedbackCategory.bug.label));
+      await tester.pumpAndSettle();
+
+      final selected = tester
+          .widgetList<Radio<FeedbackCategory>>(
+              find.byType(Radio<FeedbackCategory>))
+          .firstWhere((r) => r.value == r.groupValue);
+      expect(selected.value, FeedbackCategory.bug);
+    });
+
+    testWidgets('the name field no longer advertises itself as optional',
+        (tester) async {
+      await pumpWith(tester, EdgeInsets.zero);
+      expect(find.text('Name (optional)'), findsNothing);
+      expect(find.text('Your name'), findsOneWidget);
+    });
   });
 
   testWidgets('only the fields scroll — header and actions stay pinned',

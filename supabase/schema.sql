@@ -78,12 +78,32 @@ create policy "own_playlists"
 create table if not exists public.feedback (
   id              uuid primary key default gen_random_uuid(),
   installation_id text not null,
-  name            text,                                  -- NULL = anonymous
+  -- Nullable on purpose: the app made this field mandatory later, so rows
+  -- submitted before that still carry NULL. Read with coalesce(name, '—').
+  name            text,
+  category        text not null default 'other',         -- idea | bug | other
   message         text not null check (length(trim(message)) between 1 and 4000),
   app_version     text,
   platform        text,
   created_at      timestamptz not null default now()
 );
+
+-- Added after the table shipped, so bring existing deployments forward. Both
+-- statements are no-ops on a database that already has them, keeping this file
+-- safe to re-run start to finish.
+alter table public.feedback
+  add column if not exists category text not null default 'other';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'feedback_category_check'
+  ) then
+    alter table public.feedback
+      add constraint feedback_category_check
+      check (category in ('idea', 'bug', 'other'));
+  end if;
+end $$;
 
 create index if not exists feedback_created_at_idx
   on public.feedback (created_at desc);

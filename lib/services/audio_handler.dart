@@ -33,6 +33,7 @@ import '../services/quality_prefs.dart';
 import '../services/queue_manager.dart';
 import '../services/stream_service.dart';
 import '../services/thumb_util.dart';
+import '../services/track_rematch_service.dart';
 import '../controllers/player_controller.dart';
 import '../ui/ui_helpers.dart';
 import '../util/log.dart';
@@ -426,6 +427,61 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     _prefetchPausedUntil = DateTime.now().add(_prefetchCooldown);
   }
 
+  // ── Repairing an unplayable saved track ──────────────────────────────────
+
+  /// Try to find and adopt a working replacement for a track YouTube refuses.
+  ///
+  /// Only reached when the resolver reported a definitive UNPLAYABLE, which is
+  /// the signature of an import's fuzzy match having landed on a video that
+  /// can't be served — not of a network or rate-limit problem.
+  ///
+  /// Returns the replacement item together with its ALREADY-RESOLVED stream,
+  /// so the caller plays it without a second round-trip. Null when nothing
+  /// suitable was found, in which case the caller falls through to its normal
+  /// error handling.
+  ///
+  /// The swap is persisted through LibraryService, whose save path fires
+  /// onChanged — so for a signed-in user the corrected id reaches Supabase via
+  /// the existing debounced full-state push. No remote write happens here.
+  Future<({MediaItem item, HMStreamingData stream})?> _repairUnplayable(
+      MediaItem song) async {
+    final result = await TrackRematchService.find(
+      title: song.title,
+      artist: song.artist ?? '',
+      badVideoId: song.id,
+      resolve: (id) => checkNGetUrl(id),
+    );
+    if (result == null) return null;
+
+    // 0 rewritten is normal and not a failure: the track may be playing from
+    // search, radio, or a generated mix rather than from a saved playlist.
+    // The in-memory swap below still applies for this session.
+    final rewritten = LibraryService.replaceVideoId(
+      song.id,
+      result.videoId,
+      thumbnail: result.thumbnail,
+      duration: result.duration,
+    );
+    logD('rematch',
+        '${song.id} -> ${result.videoId}: $rewritten library entries updated');
+
+    // The old extras carry a stream URL belonging to the id we just replaced.
+    final extras = Map<String, dynamic>.from(song.extras ?? const {});
+    extras.remove('url');
+
+    // Must go through ThumbUtil at the `art` tier, exactly as _mediaItem()
+    // does for every other track: artUri feeds the notification/lockscreen,
+    // and the stored thumbnail is only tile-sized.
+    final art = result.thumbnail.isEmpty
+        ? null
+        : Uri.tryParse(ThumbUtil.get(result.thumbnail, ThumbnailSize.art));
+    final item = art == null
+        ? song.copyWith(id: result.videoId, extras: extras)
+        : song.copyWith(id: result.videoId, artUri: art, extras: extras);
+
+    return (item: item, stream: result.stream);
+  }
+
   // ── URL resolution — mirrors HarmonyMusic's checkNGetUrl() ───────────────
   // Priority: cached file → downloaded file → cached URL → fresh Isolate fetch
 
@@ -693,11 +749,31 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         mediaItem.add(song);
 
         // Fetch URL (cached or fresh) — now happens with player fully stopped
-        final streamInfo =
+        var streamInfo =
             await checkNGetUrl(song.id, generateNewUrl: isNewUrl);
 
         // Guard: user may have skipped again while we were fetching
         if (songIndex != currentIndex) return;
+
+        // YouTube refused this exact video. If the id came from an import's
+        // fuzzy match it may simply be the wrong one for a song that is
+        // otherwise available, so try to repair it in place before failing.
+        var track = song;
+        if (!streamInfo.playable &&
+            TrackRematchService.shouldRematch(streamInfo.lastStatus)) {
+          final repaired = await _repairUnplayable(song);
+          if (songIndex != currentIndex) return; // user moved on mid-repair
+          if (repaired != null) {
+            track = repaired.item;
+            streamInfo = repaired.stream;
+            final q = queue.value;
+            if (currentIndex >= 0 && currentIndex < q.length) {
+              q[currentIndex] = track;
+              queue.add(q);
+            }
+            mediaItem.add(track);
+          }
+        }
 
         if (!streamInfo.playable) {
           currentSongUrl = null;
@@ -711,8 +787,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           return;
         }
 
-        currentSongUrl = song.extras!['url'] = streamInfo.audio!.url;
-        await _engine.loadCurrent(_engine.createSource(song));
+        currentSongUrl = track.extras!['url'] = streamInfo.audio!.url;
+        await _engine.loadCurrent(_engine.createSource(track));
 
         _engine.setPhase(PlaybackPhase.ready,
             reason: 'playByIndex source ready');
@@ -1003,14 +1079,32 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
         queue.add(items);
         currentIndex = startIndex;
-        final currentItem = items[startIndex];
+        var currentItem = items[startIndex];
         mediaItem.add(currentItem);
         playbackState.add(playbackState.value.copyWith(
           processingState: AudioProcessingState.loading,
           playing: false,
         ));
 
-        final streamInfo = await checkNGetUrl(currentItem.id);
+        var streamInfo = await checkNGetUrl(currentItem.id);
+
+        // Same in-place repair as playByIndex: starting a playlist ON the dead
+        // track must not be a dead end either.
+        if (!streamInfo.playable &&
+            TrackRematchService.shouldRematch(streamInfo.lastStatus)) {
+          final repaired = await _repairUnplayable(currentItem);
+          if (repaired != null) {
+            currentItem = repaired.item;
+            streamInfo = repaired.stream;
+            final q = queue.value;
+            if (currentIndex >= 0 && currentIndex < q.length) {
+              q[currentIndex] = currentItem;
+              queue.add(q);
+            }
+            mediaItem.add(currentItem);
+          }
+        }
+
         if (!streamInfo.playable) {
           currentSongUrl = null;
           _engine.setPhase(PlaybackPhase.error,
@@ -1065,14 +1159,31 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
         queue.add(shuffleItems);
         currentIndex = 0;
-        final firstItem = shuffleItems.first;
+        var firstItem = shuffleItems.first;
         mediaItem.add(firstItem);
         playbackState.add(playbackState.value.copyWith(
           processingState: AudioProcessingState.loading,
           playing: false,
         ));
 
-        final shuffleStream = await checkNGetUrl(firstItem.id);
+        var shuffleStream = await checkNGetUrl(firstItem.id);
+
+        // Same in-place repair as playByIndex / playAllFrom.
+        if (!shuffleStream.playable &&
+            TrackRematchService.shouldRematch(shuffleStream.lastStatus)) {
+          final repaired = await _repairUnplayable(firstItem);
+          if (repaired != null) {
+            firstItem = repaired.item;
+            shuffleStream = repaired.stream;
+            final q = queue.value;
+            if (q.isNotEmpty) {
+              q[0] = firstItem;
+              queue.add(q);
+            }
+            mediaItem.add(firstItem);
+          }
+        }
+
         if (!shuffleStream.playable) {
           currentSongUrl = null;
           _engine.setPhase(PlaybackPhase.error,

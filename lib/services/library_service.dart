@@ -32,12 +32,20 @@ class LibraryTrack {
     this.addedAt,
   });
 
-  LibraryTrack copyWith({DateTime? addedAt}) => LibraryTrack(
-        videoId: videoId,
-        title: title,
-        artist: artist,
-        thumbnail: thumbnail,
-        duration: duration,
+  LibraryTrack copyWith({
+    String? videoId,
+    String? title,
+    String? artist,
+    String? thumbnail,
+    String? duration,
+    DateTime? addedAt,
+  }) =>
+      LibraryTrack(
+        videoId: videoId ?? this.videoId,
+        title: title ?? this.title,
+        artist: artist ?? this.artist,
+        thumbnail: thumbnail ?? this.thumbnail,
+        duration: duration ?? this.duration,
         addedAt: addedAt ?? this.addedAt,
       );
 
@@ -181,6 +189,77 @@ class LibraryService {
 
   static void toggleLike(LibraryTrack track) {
     isLiked(track.videoId) ? unlike(track.videoId) : like(track);
+  }
+
+  // ── Repointing a dead track ──────────────────────────────────────────────
+
+  /// Point every library entry for [oldId] at [newId] instead, in place.
+  ///
+  /// Imported playlists store a videoId that a fuzzy title/artist match picked
+  /// at import time; YouTube can later refuse that exact video while the same
+  /// song is perfectly playable under a different id. TrackRematchService finds
+  /// the replacement, and this persists it so the repair is permanent rather
+  /// than repeated on every play.
+  ///
+  /// The user's own metadata (title, artist, position, addedAt) is preserved —
+  /// only the id, and optionally the artwork/duration that came with the new
+  /// match, are rewritten. Writing through the normal save paths means
+  /// [onChanged] fires, so a signed-in user's cloud copy is pushed by the
+  /// existing debounced sync; no separate remote write is needed here.
+  ///
+  /// If [newId] is already present alongside [oldId], the stale entry is
+  /// dropped rather than duplicated.
+  ///
+  /// Returns the number of entries rewritten — 0 is normal and means the track
+  /// isn't saved anywhere (playing from search, radio, or a generated mix).
+  static int replaceVideoId(
+    String oldId,
+    String newId, {
+    String? thumbnail,
+    String? duration,
+  }) {
+    if (oldId.isEmpty || newId.isEmpty || oldId == newId) return 0;
+    var changed = 0;
+
+    List<LibraryTrack> rewrite(List<LibraryTrack> tracks) {
+      final alreadyHasNew = tracks.any((t) => t.videoId == newId);
+      final out = <LibraryTrack>[];
+      for (final t in tracks) {
+        if (t.videoId != oldId) {
+          out.add(t);
+          continue;
+        }
+        changed++;
+        // Collapse rather than duplicate when the replacement is already here.
+        if (alreadyHasNew) continue;
+        out.add(t.copyWith(
+          videoId: newId,
+          thumbnail: (thumbnail != null && thumbnail.isNotEmpty)
+              ? thumbnail
+              : null,
+          duration:
+              (duration != null && duration.isNotEmpty) ? duration : null,
+        ));
+      }
+      return out;
+    }
+
+    final liked = getLiked();
+    final before = changed;
+    final newLiked = rewrite(liked);
+    if (changed != before) {
+      _box.put('liked', newLiked.map((t) => t.toMap()).toList());
+      _notify();
+    }
+
+    final playlists = getPlaylists();
+    final beforePl = changed;
+    final newPls = [
+      for (final p in playlists) p.copyWith(tracks: rewrite(p.tracks)),
+    ];
+    if (changed != beforePl) _savePlaylists(newPls);
+
+    return changed;
   }
 
   // ── Playlists ────────────────────────────────────────────────────────────

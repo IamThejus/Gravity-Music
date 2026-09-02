@@ -8,10 +8,15 @@
 // ── What gets sent ─────────────────────────────────────────────────────────
 // Only what the user typed, plus the minimum needed to act on it:
 //
-//   • name          — exactly what they typed, or NULL if left blank
+//   • name          — exactly what they typed (required)
+//   • category      — idea / bug / other, so the inbox can be triaged
 //   • message       — exactly what they typed
 //   • installation_id — the anonymous per-install UUID (see installation_id.dart)
 //   • app_version, platform — so a bug report can be tied to a build
+//
+// The name is a display name the user chooses to type; it is NOT an account
+// identifier and is never cross-referenced with anything. The install stays
+// anonymous either way — installation_id identifies an install, not a person.
 //
 // Nothing is collected implicitly: no listening history, no video IDs, no
 // stream URLs (those carry the user's IP), no logs, no account identifiers.
@@ -28,6 +33,23 @@ import '../../util/log.dart';
 import '../installation_id.dart';
 import 'auth_service.dart';
 import 'supabase_config.dart';
+
+/// What the feedback is about. [wire] is the value stored in the database and
+/// MUST stay in sync with the `feedback_category_check` constraint in
+/// supabase/schema.sql — a value not in that list is rejected by Postgres.
+enum FeedbackCategory {
+  idea('idea', 'Idea'),
+  bug('bug', 'Bug'),
+  other('other', 'Anything at all');
+
+  const FeedbackCategory(this.wire, this.label);
+
+  /// Stored value. Short and stable, so the label can be reworded freely.
+  final String wire;
+
+  /// What the user sees next to the radio button.
+  final String label;
+}
 
 /// Thrown with a message that is safe to show the user as-is.
 class FeedbackException implements Exception {
@@ -50,12 +72,21 @@ class FeedbackService {
   static bool get isAvailable =>
       SupabaseConfig.isConfigured && AuthService.instance.isReady;
 
-  /// Submit [message], optionally attributed to [name].
+  /// Submit [message] about [category], attributed to [name].
   ///
-  /// A blank [name] is stored as SQL NULL, not the string "Anonymous" — the
-  /// display wording belongs to whoever reads the table, and NULL keeps "chose
-  /// not to say" distinguishable from someone actually called Anonymous.
-  static Future<void> submit({String? name, required String message}) async {
+  /// [name] is required. The column stays nullable so rows written before the
+  /// field was mandatory still read back correctly — don't assume non-null
+  /// when querying.
+  static Future<void> submit({
+    required String name,
+    required FeedbackCategory category,
+    required String message,
+  }) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      throw const FeedbackException('Please add your name.');
+    }
+
     final trimmedMessage = message.trim();
     if (trimmedMessage.isEmpty) {
       throw const FeedbackException('Please write a message first.');
@@ -69,21 +100,18 @@ class FeedbackService {
           'Feedback needs a connection to the Gravity server. Try again later.');
     }
 
-    final trimmedName = name?.trim();
-
     try {
       await Supabase.instance.client.from('feedback').insert({
         'installation_id': installationId(),
-        'name': (trimmedName == null || trimmedName.isEmpty)
-            ? null
-            : trimmedName.substring(
-                0, trimmedName.length.clamp(0, maxNameLength)),
+        'name': trimmedName.substring(
+            0, trimmedName.length.clamp(0, maxNameLength)),
+        'category': category.wire,
         'message': trimmedMessage,
         'app_version': await _appVersion(),
         'platform': Platform.operatingSystem,
       });
-      logD('feedback', 'submitted (${trimmedMessage.length} chars, '
-          'named=${trimmedName != null && trimmedName.isNotEmpty})');
+      logD('feedback',
+          'submitted (${category.wire}, ${trimmedMessage.length} chars)');
     } on PostgrestException catch (e) {
       logD('feedback', 'submit failed — ${e.code}: ${e.message}');
       // The rate-limit trigger and the message CHECK constraint BOTH raise

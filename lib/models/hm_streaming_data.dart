@@ -9,6 +9,10 @@ class HMStreamingData {
   final bool playable;
   final String statusMSG;
 
+  /// Raw playabilityStatus behind a failure ('UNPLAYABLE', 'LOGIN_REQUIRED',
+  /// …); '' when unknown or when playback succeeded. See StreamProvider.
+  final String lastStatus;
+
   /// Audio formats ranked best-first (index 0 = highest bitrate). The number
   /// of entries varies per song, so the user's quality preference is stored as
   /// a normalized 0.0–1.0 value and mapped onto this list (see [setQualityPref]).
@@ -19,6 +23,7 @@ class HMStreamingData {
   HMStreamingData({
     required this.playable,
     required this.statusMSG,
+    this.lastStatus = '',
     List<Audio>? formats,
   }) : formats = formats ?? const [] {
     _audio = this.formats.isNotEmpty ? this.formats.first : null;
@@ -43,6 +48,7 @@ class HMStreamingData {
     return HMStreamingData(
       playable: json['playable'] ?? false,
       statusMSG: json['statusMSG'] ?? '',
+      lastStatus: json['lastStatus'] ?? '',
       formats: formats,
     );
   }
